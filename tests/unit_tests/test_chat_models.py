@@ -2,8 +2,9 @@
 
 from typing import Type
 
-from langchain_writer.chat_models import ChatWriter
 from langchain_tests.unit_tests import ChatModelUnitTests
+
+from langchain_writer.chat_models import ChatWriter
 
 
 class TestChatWriterUnit(ChatModelUnitTests):

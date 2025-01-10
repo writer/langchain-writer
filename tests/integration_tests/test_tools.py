@@ -1,7 +1,8 @@
 from typing import Type
 
-from langchain_writer.tools import WriterTool
 from langchain_tests.integration_tests import ToolsIntegrationTests
+
+from langchain_writer.tools import WriterTool
 
 
 class TestParrotMultiplyToolIntegration(ToolsIntegrationTests):
