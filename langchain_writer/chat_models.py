@@ -20,14 +20,16 @@ from langchain_core.callbacks import (
     CallbackManagerForLLMRun,
 )
 from langchain_core.language_models import BaseChatModel, LanguageModelInput
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
-from langchain_core.messages.ai import UsageMetadata
+from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import Runnable
-from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_core.utils.utils import from_env, secret_from_env
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from typing_extensions import Self
 from writerai import AsyncWriter, Writer
+
+from langchain_writer.utils import _convert_dict_to_message, _convert_message_to_dict
 
 
 class ChatWriter(BaseChatModel):
@@ -249,16 +251,16 @@ class ChatWriter(BaseChatModel):
     model_name: str = Field(default="palmyra-x-004", alias="model")
 
     """What sampling temperature to use."""
-    temperature: float = 0.7
+    temperature: float = Field(default=0.7, ge=0, le=1)
 
     """Holds any model parameters valid for `create` call not explicitly specified."""
     model_kwargs: Dict[str, Any] = Field(default_factory=dict)
 
     """Number of chat completions to generate for each prompt."""
-    n: int = 1
+    n: int = Field(default=1, ge=1)
 
     """Maximum number of tokens to generate."""
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = Field(default=None, ge=1)
 
     """Default stop sequences."""
     stop: Optional[Union[str, List[str]]] = Field(default=None, alias="stop_sequences")
@@ -275,11 +277,28 @@ class ChatWriter(BaseChatModel):
     )
 
     """Maximum number of retries to make when generating."""
-    max_retries: Optional[int] = None
+    max_retries: int = Field(default=2, gt=0)
 
     model_config = ConfigDict(
         populate_by_name=True,
     )
+
+    @model_validator(mode="after")
+    def validate_environment(self) -> Self:
+        """Validate that api key exists in environment."""
+
+        client_params = {
+            "api_key": (self.api_key.get_secret_value() if self.api_key else None),
+            "timeout": self.request_timeout,
+            "max_retries": self.max_retries,
+            "base_url": self.api_base,
+        }
+
+        if not self.client:
+            self.client = Writer(**client_params)
+        if not self.async_client:
+            self.async_client = AsyncWriter(**client_params)
+        return self
 
     @property
     def _llm_type(self) -> str:
@@ -311,6 +330,45 @@ class ChatWriter(BaseChatModel):
             **self.model_kwargs,
         }
 
+    def _convert_messages_to_dicts(
+        self, messages: List[BaseMessage], stop: Optional[List[str]] = None
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """Convert a list of LangChain messages to List of Writer dicts."""
+        params = self._default_params
+        if stop:
+            params["stop"] = stop
+
+        message_dicts = [_convert_message_to_dict(m) for m in messages]
+        return message_dicts, params
+
+    def _create_chat_result(self, response: Union[dict, BaseModel]) -> ChatResult:
+        generations = []
+        if not isinstance(response, dict):
+            response = response.model_dump()
+        token_usage = response.get("usage", {})
+        for res in response["choices"]:
+            message = _convert_dict_to_message(res["message"])
+            if token_usage:
+                message.usage_metadata = {
+                    "input_tokens": token_usage.get("prompt_tokens", 0),
+                    "output_tokens": token_usage.get("completion_tokens", 0),
+                    "total_tokens": token_usage.get("total_tokens", 0),
+                }
+            generation_info = dict(finish_reason=res.get("finish_reason"))
+            if "logprobs" in res:
+                generation_info["logprobs"] = res["logprobs"]
+            gen = ChatGeneration(
+                message=message,
+                generation_info=generation_info,
+            )
+            generations.append(gen)
+        llm_output = {
+            "token_usage": token_usage,
+            "model_name": self.model_name,
+            "system_fingerprint": response.get("system_fingerprint", ""),
+        }
+        return ChatResult(generations=generations, llm_output=llm_output)
+
     def _generate(
         self,
         messages: List[BaseMessage],
@@ -318,43 +376,22 @@ class ChatWriter(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """Override the _generate method to implement the chat model logic.
+        message_dicts, params = self._convert_messages_to_dicts(messages, stop)
+        params = {**params, **kwargs}
+        response = self.client.chat.chat(messages=message_dicts, **params)
+        return self._create_chat_result(response)
 
-        This can be a call to an API, a call to a local model, or any other
-        implementation that generates a response to the input prompt.
-
-        Args:
-            messages: the prompt composed of a list of messages.
-            stop: a list of strings on which the model should stop generating.
-                  If generation stops due to a stop token, the stop token itself
-                  SHOULD BE INCLUDED as part of the output. This is not enforced
-                  across models right now, but it's a good practice to follow since
-                  it makes it much easier to parse the output of the model
-                  downstream and understand why generation stopped.
-            run_manager: A run manager with callbacks for the LLM.
-        """
-        # Replace this with actual logic to generate a response from a list
-        # of messages.
-        last_message = messages[-1]
-        tokens = last_message.content[: self.parrot_buffer_length]
-        ct_input_tokens = sum(len(message.content) for message in messages)
-        ct_output_tokens = len(tokens)
-        message = AIMessage(
-            content=tokens,
-            additional_kwargs={},  # Used to add additional payload to the message
-            response_metadata={  # Use for response metadata
-                "time_in_seconds": 3,
-            },
-            usage_metadata={
-                "input_tokens": ct_input_tokens,
-                "output_tokens": ct_output_tokens,
-                "total_tokens": ct_input_tokens + ct_output_tokens,
-            },
-        )
-        ##
-
-        generation = ChatGeneration(message=message)
-        return ChatResult(generations=[generation])
+    async def _agenerate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        message_dicts, params = self._convert_messages_to_writer(messages, stop)
+        params = {**params, **kwargs}
+        response = await self.async_client.chat.chat(messages=message_dicts, **params)
+        return self._create_chat_result(response)
 
     def _stream(
         self,
@@ -363,56 +400,37 @@ class ChatWriter(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        """Stream the output of the model.
+        message_dicts, params = self._convert_messages_to_writer(messages, stop)
+        params = {**params, **kwargs, "stream": True}
 
-        This method should be implemented if the model can generate output
-        in a streaming fashion. If the model does not support streaming,
-        do not implement it. In that case streaming requests will be automatically
-        handled by the _generate method.
+        response = self.client.chat.chat(messages=message_dicts, **params)
 
-        Args:
-            messages: the prompt composed of a list of messages.
-            stop: a list of strings on which the model should stop generating.
-                  If generation stops due to a stop token, the stop token itself
-                  SHOULD BE INCLUDED as part of the output. This is not enforced
-                  across models right now, but it's a good practice to follow since
-                  it makes it much easier to parse the output of the model
-                  downstream and understand why generation stopped.
-            run_manager: A run manager with callbacks for the LLM.
-        """
-        last_message = messages[-1]
-        tokens = str(last_message.content[: self.parrot_buffer_length])
-        ct_input_tokens = sum(len(message.content) for message in messages)
-
-        for token in tokens:
-            usage_metadata = UsageMetadata(
-                {
-                    "input_tokens": ct_input_tokens,
-                    "output_tokens": 1,
-                    "total_tokens": ct_input_tokens + 1,
-                }
+        for chunk in response:
+            if (
+                len(chunk.choices) == 0
+                or not chunk.choices[0].delta
+                or not chunk.choices[0].delta.content
+            ):
+                continue
+            delta = chunk.choices[0].delta
+            message_chunk = self._convert_dict_chunk_to_message_chunk(
+                {"role": "assistant", "content": delta.content}
             )
-            ct_input_tokens = 0
-            chunk = ChatGenerationChunk(
-                message=AIMessageChunk(content=token, usage_metadata=usage_metadata)
+            generation_info = {}
+            if finish_reason := chunk.choices[0].finish_reason:
+                generation_info["finish_reason"] = finish_reason
+            if logprobs := chunk.choices[0].logprobs:
+                generation_info["logprobs"] = logprobs
+            generation_chunk = ChatGenerationChunk(
+                message=message_chunk,
+                generation_info=message_chunk.generation_info or None,
             )
 
             if run_manager:
-                # This is optional in newer versions of LangChain
-                # The on_llm_new_token will be called automatically
-                run_manager.on_llm_new_token(token, chunk=chunk)
-
+                run_manager.on_llm_new_token(
+                    generation_chunk.text, chunk=generation_chunk, logprobs=logprobs
+                )
             yield chunk
-
-        # Let's add some other information (e.g., response metadata)
-        chunk = ChatGenerationChunk(
-            message=AIMessageChunk(content="", response_metadata={"time_in_sec": 3})
-        )
-        if run_manager:
-            # This is optional in newer versions of LangChain
-            # The on_llm_new_token will be called automatically
-            run_manager.on_llm_new_token(token, chunk=chunk)
-        yield chunk
 
     async def _astream(
         self,
@@ -420,25 +438,66 @@ class ChatWriter(BaseChatModel):
         stop: Optional[List[str]] = None,
         run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[ChatGenerationChunk]: ...
+    ) -> AsyncIterator[ChatGenerationChunk]:
+        message_dicts, params = self._convert_messages_to_writer(messages, stop)
+        params = {**params, **kwargs, "stream": True}
 
-    async def _agenerate(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> ChatResult: ...
+        response = await self.async_client.chat.chat(messages=message_dicts, **params)
+
+        async for chunk in response:
+            if (
+                len(chunk.choices) == 0
+                or not chunk.choices[0].delta
+                or not chunk.choices[0].delta.content
+            ):
+                continue
+            delta = chunk.choices[0].delta
+            message_chunk = self._convert_dict_chunk_to_message_chunk(
+                {"role": "assistant", "content": delta.content}
+            )
+            generation_info = {}
+            if finish_reason := chunk.choices[0].finish_reason:
+                generation_info["finish_reason"] = finish_reason
+            if logprobs := chunk.choices[0].logprobs:
+                generation_info["logprobs"] = logprobs
+            generation_chunk = ChatGenerationChunk(
+                message=message_chunk,
+                generation_info=message_chunk.generation_info or None,
+            )
+
+            if run_manager:
+                await run_manager.on_llm_new_token(
+                    generation_chunk.text, chunk=generation_chunk, logprobs=logprobs
+                )
+            yield chunk
 
     def bind_tools(
         self,
-        tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable, BaseTool]],
+        tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable]],
         *,
-        tool_choice: Optional[
-            Union[dict, str, Literal["auto", "any", "none"], bool]
-        ] = None,
+        tool_choice: Optional[Union[str, Literal["auto", "none"]]] = None,
         **kwargs: Any,
-    ) -> Runnable[LanguageModelInput, BaseMessage]: ...
+    ) -> Runnable[LanguageModelInput, BaseMessage]:
+        """Bind tools to the chat model.
+
+        Args:
+            tools: Tools to bind to the model
+            tool_choice: Which tool to require ('auto', 'none', or specific tool name)
+            **kwargs: Additional parameters to pass to the chat model
+
+        Returns:
+            A runnable that will use the tools
+        """
+        formatted_tools = [convert_to_openai_tool(tool) for tool in tools]
+
+        if tool_choice:
+            kwargs["tool_choice"] = (
+                (tool_choice)
+                if tool_choice in ("auto", "none")
+                else {"type": "function", "function": {"name": tool_choice}}
+            )
+
+        return super().bind(tools=formatted_tools, **kwargs)
 
     def with_structured_output(
         self,
