@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 from langchain_core.messages import (
     AIMessage,
@@ -8,19 +8,21 @@ from langchain_core.messages import (
     BaseMessageChunk,
     ChatMessage,
     ChatMessageChunk,
-    FunctionMessageChunk,
     HumanMessage,
     HumanMessageChunk,
     SystemMessage,
     SystemMessageChunk,
-    ToolCallChunk,
     ToolMessage,
     ToolMessageChunk,
 )
 from langchain_core.messages.tool import tool_call_chunk as create_tool_call_chunk
+from langchain_core.output_parsers.openai_tools import (
+    make_invalid_tool_call,
+    parse_tool_call,
+)
 
 
-def _convert_message_to_dict(message: BaseMessage) -> dict:
+def convert_message_to_dict(message: BaseMessage) -> dict:
     """Convert a LangChain message to Writer dictionary.
 
     Args:
@@ -61,7 +63,7 @@ def _convert_message_to_dict(message: BaseMessage) -> dict:
     return message_dict
 
 
-def _convert_dict_to_message(response_message: Any) -> BaseMessage:
+def convert_dict_to_message(response_message: Any) -> BaseMessage:
     """Convert a Writer message or dictionary to a LangChain message.
 
     Args:
@@ -77,16 +79,30 @@ def _convert_dict_to_message(response_message: Any) -> BaseMessage:
         )
 
     role = response_message.get("role", "") or ""
-    content = response_message.get("content", "") or ""  # check on
+    content = response_message.get("content", "") or ""
 
     if role == "user":
         return HumanMessage(content=content)
     elif role == "assistant":
         additional_kwargs = {}
-        if tool_calls := response_message.get("tool_calls", []):
-            additional_kwargs["tool_calls"] = tool_calls
-        # TODO check on tool calls parsing
-        return AIMessage(content=content, additional_kwargs=additional_kwargs)
+
+        tool_calls = []
+        invalid_tool_calls = []
+        if raw_tool_calls := response_message.get("tool_calls", []):
+            additional_kwargs["tool_calls"] = raw_tool_calls
+            for raw_tool_call in raw_tool_calls:
+                try:
+                    tool_calls.append(parse_tool_call(raw_tool_call, return_id=True))
+                except Exception as e:
+                    invalid_tool_calls.append(
+                        dict(make_invalid_tool_call(raw_tool_call, str(e)))
+                    )
+        return AIMessage(
+            content=content,
+            additional_kwargs=additional_kwargs,
+            tool_calls=tool_calls,
+            invalid_tool_calls=invalid_tool_calls,
+        )
     elif role == "system":
         return SystemMessage(content=content)
     elif role == "tool":
@@ -103,59 +119,52 @@ def _convert_dict_to_message(response_message: Any) -> BaseMessage:
         return ChatMessage(content=content, role=role)
 
 
-# TODO check on chunk creation
-def _convert_dict_chunk_to_message_chunk(chunk: Any) -> BaseMessageChunk:
+def convert_dict_chunk_to_message_chunk(chunk: Any) -> BaseMessageChunk:
     if not isinstance(chunk, dict):
         chunk = json.loads(json.dumps(chunk, default=lambda o: o.__dict__))
-    choice = chunk["choices"][0]
-    _dict = choice["delta"]
-    role = cast(str, _dict.get("role"))
-    content = cast(str, _dict.get("content") or "")
-    additional_kwargs: Dict = {}
-    tool_call_chunks: List[ToolCallChunk] = []
-    if _dict.get("function_call"):
-        function_call = dict(_dict["function_call"])
-        if "name" in function_call and function_call["name"] is None:
-            function_call["name"] = ""
-        additional_kwargs["function_call"] = function_call
-    if raw_tool_calls := _dict.get("tool_calls"):
-        additional_kwargs["tool_calls"] = raw_tool_calls
-        for rtc in raw_tool_calls:
-            try:
-                tool_call_chunks.append(
-                    create_tool_call_chunk(
-                        name=rtc["function"].get("name"),
-                        args=rtc["function"].get("arguments"),
-                        id=rtc.get("id"),
-                        index=rtc.get("index"),
-                    )
-                )
-            except KeyError:
-                pass
+
+    delta = chunk["choices"][0]["delta"]
+
+    role = cast(str, delta.get("role"))
+    content = cast(str, delta.get("content") or "")
+
     if role == "user":
         return HumanMessageChunk(content=content)
     elif role == "assistant":
         if usage := chunk.get("usage"):
-            input_tokens = usage.get("prompt_tokens", 0)
-            output_tokens = usage.get("completion_tokens", 0)
             usage_metadata = {
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": usage.get("total_tokens", input_tokens + output_tokens),
+                "input_tokens": usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
             }
         else:
             usage_metadata = None
+
+        additional_kwargs = {}
+        tool_call_chunks = []
+        if raw_tool_calls := delta.get("tool_calls"):
+            additional_kwargs["tool_calls"] = raw_tool_calls
+            for rtc in raw_tool_calls:
+                try:
+                    tool_call_chunks.append(
+                        create_tool_call_chunk(
+                            name=rtc["function"].get("name"),
+                            args=rtc["function"].get("arguments"),
+                            id=rtc.get("id"),
+                            index=rtc.get("index"),
+                        )
+                    )
+                except KeyError:
+                    pass
         return AIMessageChunk(
             content=content,
             additional_kwargs=additional_kwargs,
             tool_call_chunks=tool_call_chunks,
-            usage_metadata=usage_metadata,  # type: ignore[arg-type]
+            usage_metadata=usage_metadata,
         )
     elif role == "system":
         return SystemMessageChunk(content=content)
-    elif role == "function":
-        return FunctionMessageChunk(content=content, name=_dict["name"])
     elif role == "tool":
-        return ToolMessageChunk(content=content, tool_call_id=_dict["tool_call_id"])
+        return ToolMessageChunk(content=content, tool_call_id=delta["tool_call_id"])
     elif role:
         return ChatMessageChunk(content=content, role=role)

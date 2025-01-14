@@ -29,7 +29,11 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from typing_extensions import Self
 from writerai import AsyncWriter, Writer
 
-from langchain_writer.utils import _convert_dict_to_message, _convert_message_to_dict
+from langchain_writer.utils import (
+    convert_dict_chunk_to_message_chunk,
+    convert_dict_to_message,
+    convert_message_to_dict,
+)
 
 
 class ChatWriter(BaseChatModel):
@@ -279,6 +283,9 @@ class ChatWriter(BaseChatModel):
     """Maximum number of retries to make when generating."""
     max_retries: int = Field(default=2, gt=0)
 
+    """Return logprobs or not"""
+    logprobs: bool = Field(default=True)
+
     model_config = ConfigDict(
         populate_by_name=True,
     )
@@ -327,6 +334,7 @@ class ChatWriter(BaseChatModel):
             "n": self.n,
             "max_tokens": self.max_tokens,
             "stop": self.stop,
+            "logprobs": self.logprobs,
             **self.model_kwargs,
         }
 
@@ -338,7 +346,7 @@ class ChatWriter(BaseChatModel):
         if stop:
             params["stop"] = stop
 
-        message_dicts = [_convert_message_to_dict(m) for m in messages]
+        message_dicts = [convert_message_to_dict(m) for m in messages]
         return message_dicts, params
 
     def _create_chat_result(self, response: Union[dict, BaseModel]) -> ChatResult:
@@ -347,7 +355,7 @@ class ChatWriter(BaseChatModel):
             response = response.model_dump()
         token_usage = response.get("usage", {})
         for res in response["choices"]:
-            message = _convert_dict_to_message(res["message"])
+            message = convert_dict_to_message(res["message"])
             if token_usage:
                 message.usage_metadata = {
                     "input_tokens": token_usage.get("prompt_tokens", 0),
@@ -388,7 +396,7 @@ class ChatWriter(BaseChatModel):
         run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        message_dicts, params = self._convert_messages_to_writer(messages, stop)
+        message_dicts, params = self._convert_messages_to_dicts(messages, stop)
         params = {**params, **kwargs}
         response = await self.async_client.chat.chat(messages=message_dicts, **params)
         return self._create_chat_result(response)
@@ -400,22 +408,15 @@ class ChatWriter(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        message_dicts, params = self._convert_messages_to_writer(messages, stop)
+        message_dicts, params = self._convert_messages_to_dicts(messages, stop)
         params = {**params, **kwargs, "stream": True}
 
         response = self.client.chat.chat(messages=message_dicts, **params)
 
         for chunk in response:
-            if (
-                len(chunk.choices) == 0
-                or not chunk.choices[0].delta
-                or not chunk.choices[0].delta.content
-            ):
+            if len(chunk.choices) == 0:
                 continue
-            delta = chunk.choices[0].delta
-            message_chunk = self._convert_dict_chunk_to_message_chunk(
-                {"role": "assistant", "content": delta.content}
-            )
+            message_chunk = convert_dict_chunk_to_message_chunk(chunk)
             generation_info = {}
             if finish_reason := chunk.choices[0].finish_reason:
                 generation_info["finish_reason"] = finish_reason
@@ -423,14 +424,14 @@ class ChatWriter(BaseChatModel):
                 generation_info["logprobs"] = logprobs
             generation_chunk = ChatGenerationChunk(
                 message=message_chunk,
-                generation_info=message_chunk.generation_info or None,
+                generation_info=generation_info,
             )
 
             if run_manager:
                 run_manager.on_llm_new_token(
                     generation_chunk.text, chunk=generation_chunk, logprobs=logprobs
                 )
-            yield chunk
+            yield generation_chunk
 
     async def _astream(
         self,
@@ -439,22 +440,15 @@ class ChatWriter(BaseChatModel):
         run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
-        message_dicts, params = self._convert_messages_to_writer(messages, stop)
+        message_dicts, params = self._convert_messages_to_dicts(messages, stop)
         params = {**params, **kwargs, "stream": True}
 
         response = await self.async_client.chat.chat(messages=message_dicts, **params)
 
         async for chunk in response:
-            if (
-                len(chunk.choices) == 0
-                or not chunk.choices[0].delta
-                or not chunk.choices[0].delta.content
-            ):
+            if len(chunk.choices) == 0:
                 continue
-            delta = chunk.choices[0].delta
-            message_chunk = self._convert_dict_chunk_to_message_chunk(
-                {"role": "assistant", "content": delta.content}
-            )
+            message_chunk = convert_dict_chunk_to_message_chunk(chunk)
             generation_info = {}
             if finish_reason := chunk.choices[0].finish_reason:
                 generation_info["finish_reason"] = finish_reason
@@ -462,14 +456,14 @@ class ChatWriter(BaseChatModel):
                 generation_info["logprobs"] = logprobs
             generation_chunk = ChatGenerationChunk(
                 message=message_chunk,
-                generation_info=message_chunk.generation_info or None,
+                generation_info=generation_info,
             )
 
             if run_manager:
                 await run_manager.on_llm_new_token(
                     generation_chunk.text, chunk=generation_chunk, logprobs=logprobs
                 )
-            yield chunk
+            yield generation_chunk
 
     def bind_tools(
         self,
@@ -499,11 +493,11 @@ class ChatWriter(BaseChatModel):
 
         return super().bind(tools=formatted_tools, **kwargs)
 
-    def with_structured_output(
-        self,
-        schema: Optional[Union[Dict, Type[BaseModel]]] = None,
-        *,
-        method: Literal["function_calling", "json_mode"] = "function_calling",
-        include_raw: bool = False,
-        **kwargs: Any,
-    ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]: ...
+    # def with_structured_output(
+    #     self,
+    #     schema: Optional[Union[Dict, Type[BaseModel]]] = None,
+    #     *,
+    #     method: Literal["function_calling", "json_mode"] = "function_calling",
+    #     include_raw: bool = False,
+    #     **kwargs: Any,
+    # ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]: ...
