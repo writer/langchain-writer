@@ -3,19 +3,21 @@
 You need WRITER_API_KEY set in your environment to run these tests.
 """
 
-from typing import Optional
+from typing import Optional, cast
 
 import pytest
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
     BaseMessage,
+    BaseMessageChunk,
     HumanMessage,
     SystemMessage,
 )
 from langchain_core.outputs import ChatGeneration, ChatResult, LLMResult
 from langchain_core.runnables import RunnableBinding
 from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 
 from langchain_writer.chat_models import ChatWriter
 
@@ -62,6 +64,18 @@ def get_laliga_points(club_name: str) -> Optional[int]:
         return None
 
 
+class GetWeather(BaseModel):
+    """Get the current weather in a given location"""
+
+    location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
+
+
+class GetPopulation(BaseModel):
+    """Get the current population in a given location"""
+
+    location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
+
+
 def test_tool_binding(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points]
@@ -78,10 +92,32 @@ def test_invoke(chat_writer: ChatWriter):
     assert len(response.content) > 0
 
 
+def test_response_metadata(chat_writer: ChatWriter):
+    result = chat_writer.invoke([HumanMessage(content="How to how?")], logprobs=True)
+    assert result.response_metadata
+    assert all(
+        k in result.response_metadata
+        for k in (
+            "token_usage",
+            "model_name",
+            "logprobs",
+            "system_fingerprint",
+            "finish_reason",
+        )
+    )
+
+
 def test_invoke_stop(chat_writer: ChatWriter):
     response = chat_writer.invoke("Hello", stop=[" "])
 
     assert response.content[-1] == " "
+
+
+def test_llm_output_contains_model_name(chat_writer: ChatWriter):
+    message = HumanMessage(content="Hello")
+    llm_result = chat_writer.generate([[message]])
+    assert llm_result.llm_output is not None
+    assert llm_result.llm_output["model_name"] == chat_writer.model_name
 
 
 def test_system_message(chat_writer: ChatWriter):
@@ -104,6 +140,25 @@ def test_tool_calls(chat_writer: ChatWriter):
     )
 
     assert len(response.tool_calls) == 2
+    for tool_call in response.tool_calls:
+        assert tool_call["name"] in [
+            "get_supercopa_trophies_count",
+            "get_laliga_points",
+        ]
+
+
+def test_tool_call_pydantic_definition(chat_writer: ChatWriter):
+    chat_with_tools = chat_writer.bind_tools(
+        [GetWeather, GetPopulation], tool_choice="auto"
+    )
+
+    response = chat_with_tools.invoke(
+        "Which city is hotter today and which is bigger: LA or NY?"
+    )
+
+    assert len(response.tool_calls) == 4
+    for tool_call in response.tool_calls:
+        assert tool_call["name"] in ["GetWeather", "GetPopulation"]
 
 
 def test_tool_calls_choice(chat_writer: ChatWriter):
@@ -117,7 +172,8 @@ def test_tool_calls_choice(chat_writer: ChatWriter):
     )
 
     assert len(response.tool_calls) == 2
-    print(response.tool_calls)
+    for call in response.tool_calls:
+        assert call["name"] == "get_laliga_points"
 
 
 def test_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
@@ -177,7 +233,7 @@ def test_batch(chat_writer: ChatWriter):
             "How to compose poem?",
             "How to run faster?",
         ],
-        config={"max_concurrency": 3},
+        config={"max_concurrency": 2},
     )
 
     assert len(response) == 3
@@ -217,6 +273,24 @@ async def test_async_generation_with_n(chat_writer: ChatWriter):
 
 
 @pytest.mark.asyncio
+async def test_async_response_metadata(chat_writer: ChatWriter):
+    result = await chat_writer.ainvoke(
+        [HumanMessage(content="How to how?")], logprobs=True
+    )
+    assert result.response_metadata
+    assert all(
+        k in result.response_metadata
+        for k in (
+            "token_usage",
+            "model_name",
+            "logprobs",
+            "system_fingerprint",
+            "finish_reason",
+        )
+    )
+
+
+@pytest.mark.asyncio
 async def test_abatch(chat_writer: ChatWriter):
     response = await chat_writer.abatch(
         [
@@ -246,6 +320,14 @@ def test_streaming_stop(chat_writer: ChatWriter):
         assert isinstance(chunk.content, str)
 
     assert resulting_text[-1] == " "
+
+
+def test_response_metadata_streaming(chat_writer: ChatWriter):
+    full: Optional[BaseMessageChunk] = None
+    for chunk in chat_writer.stream("How to how?", logprobs=True):
+        assert isinstance(chunk.content, str)
+        full = chunk if full is None else full + chunk
+    assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata
 
 
 def test_system_message_streaming(chat_writer: ChatWriter):

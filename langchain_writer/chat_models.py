@@ -20,7 +20,25 @@ from langchain_core.callbacks import (
     CallbackManagerForLLMRun,
 )
 from langchain_core.language_models import BaseChatModel, LanguageModelInput
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    BaseMessageChunk,
+    ChatMessage,
+    ChatMessageChunk,
+    HumanMessage,
+    HumanMessageChunk,
+    SystemMessage,
+    SystemMessageChunk,
+    ToolMessage,
+    ToolMessageChunk,
+)
+from langchain_core.messages.tool import tool_call_chunk as create_tool_call_chunk
+from langchain_core.output_parsers.openai_tools import (
+    make_invalid_tool_call,
+    parse_tool_call,
+)
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import Runnable
 from langchain_core.utils.function_calling import convert_to_openai_tool
@@ -29,11 +47,188 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from typing_extensions import Self
 from writerai import AsyncWriter, Writer
 
-from langchain_writer.utils import (
-    convert_dict_chunk_to_message_chunk,
-    convert_dict_to_message,
-    convert_message_to_dict,
-)
+
+def convert_message_to_dict(message: BaseMessage) -> dict:
+    """Convert a LangChain message to Writer dictionary.
+
+    Args:
+        message: The LangChain message.
+
+    Returns:
+        The dictionary.
+    """
+
+    message_dict = {"role": "", "content": message.content}
+
+    if isinstance(message, ChatMessage):
+        message_dict["role"] = message.role
+    elif isinstance(message, HumanMessage):
+        message_dict["role"] = "user"
+    elif isinstance(message, AIMessage):
+        message_dict["role"] = "assistant"
+        if message.tool_calls:
+            message_dict["tool_calls"] = [
+                {
+                    "id": tool["id"],
+                    "type": "function",
+                    "function": {"name": tool["name"], "arguments": tool["args"]},
+                }
+                for tool in message.tool_calls
+            ]
+    elif isinstance(message, SystemMessage):
+        message_dict["role"] = "system"
+    elif isinstance(message, ToolMessage):
+        message_dict["role"] = "tool"
+        message_dict["tool_call_id"] = message.tool_call_id
+    else:
+        raise ValueError(f"Got unknown message type: {type(message)}")
+
+    if message.name:
+        message_dict["name"] = message.name
+
+    return message_dict
+
+
+def convert_dict_to_message(response_message: dict) -> BaseMessage:
+    """Convert a Writer dictionary to a LangChain message.
+
+    Args:
+        response_message: The response dictionary.
+
+    Returns:
+        The LangChain message.
+    """
+
+    if not isinstance(response_message, dict):
+        raise ValueError(f"Expected 'dict' but got: {type(response_message)}")
+
+    role = response_message.get("role", "") or ""
+    content = response_message.get("content", "") or ""
+
+    if role == "user":
+        return HumanMessage(content=content)
+    elif role == "assistant":
+        additional_kwargs = {}
+
+        tool_calls = []
+        invalid_tool_calls = []
+        if raw_tool_calls := response_message.get("tool_calls", []):
+            additional_kwargs["tool_calls"] = raw_tool_calls
+            for raw_tool_call in raw_tool_calls:
+                try:
+                    tool_calls.append(parse_tool_call(raw_tool_call, return_id=True))
+                except Exception as e:
+                    invalid_tool_calls.append(
+                        dict(make_invalid_tool_call(raw_tool_call, str(e)))
+                    )
+        return AIMessage(
+            content=content,
+            additional_kwargs=additional_kwargs,
+            tool_calls=tool_calls,
+            invalid_tool_calls=invalid_tool_calls,
+        )
+    elif role == "system":
+        return SystemMessage(content=content)
+    elif role == "tool":
+        additional_kwargs = {}
+        if "name" in response_message:
+            additional_kwargs["name"] = response_message["name"]
+        return ToolMessage(
+            content=content,
+            tool_call_id=response_message.get("tool_call_id", ""),
+            name=response_message.get("name", ""),
+            additional_kwargs=additional_kwargs,
+        )
+    else:
+        return ChatMessage(content=content, role=role)
+
+
+def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
+    """Convert a Writer chunk dictionary to a LangChain message.
+
+    Args:
+        chunk: The response dictionary.
+
+    Returns:
+        The LangChain message chunk.
+    """
+
+    if not isinstance(chunk, dict):
+        raise ValueError(f"Expected 'dict' but got: {type(chunk)}")
+
+    delta = chunk["choices"][0]["delta"]
+
+    role = delta.get("role", "") or ""
+    content = delta.get("content", "") or ""
+
+    if role == "user":
+        return HumanMessageChunk(content=content)
+    elif role == "assistant":
+        if usage := chunk.get("usage"):
+            usage_metadata = {
+                "input_tokens": usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+            }
+        else:
+            usage_metadata = None
+
+        additional_kwargs = {}
+        tool_call_chunks = []
+        if raw_tool_calls := delta.get("tool_calls"):
+            additional_kwargs["tool_calls"] = raw_tool_calls
+            for rtc in raw_tool_calls:
+                try:
+                    tool_call_chunks.append(
+                        create_tool_call_chunk(
+                            name=rtc["function"].get("name"),
+                            args=rtc["function"].get("arguments"),
+                            id=rtc.get("id"),
+                            index=rtc.get("index"),
+                        )
+                    )
+                except KeyError:
+                    pass
+        return AIMessageChunk(
+            content=content,
+            additional_kwargs=additional_kwargs,
+            tool_call_chunks=tool_call_chunks,
+            usage_metadata=usage_metadata,
+        )
+    elif role == "system":
+        return SystemMessageChunk(content=content)
+    elif role == "tool":
+        return ToolMessageChunk(content=content, tool_call_id=delta["tool_call_id"])
+    else:
+        return ChatMessageChunk(content=content, role=role)
+
+
+def create_chat_generation_chunk(
+    chunk: Union[dict, BaseModel]
+) -> tuple[ChatGeneration, dict]:
+    """Convert a Writer message to a LangChain ChatGeneration chunk and logprobs.
+
+    Args:
+        chunk: The response dictionary.
+
+    Returns:
+        The LangChain ChatGeneration chunk and loprobs.
+    """
+    if not isinstance(chunk, dict):
+        chunk = chunk.model_dump()
+
+    message_chunk = convert_dict_chunk_to_message_chunk(chunk)
+    generation_info = {}
+    if finish_reason := chunk["choices"][0]["finish_reason"]:
+        generation_info["finish_reason"] = finish_reason
+    if logprobs := chunk["choices"][0]["logprobs"]:
+        generation_info["logprobs"] = logprobs
+    generation_chunk = ChatGenerationChunk(
+        message=message_chunk,
+        generation_info=generation_info,
+    )
+
+    return generation_chunk, logprobs
 
 
 class ChatWriter(BaseChatModel):
@@ -86,8 +281,6 @@ class ChatWriter(BaseChatModel):
 
         .. code-block:: python
 
-            # TODO: Example output.
-
     Stream:
         .. code-block:: python
 
@@ -95,11 +288,6 @@ class ChatWriter(BaseChatModel):
 
                 print(chunk)
 
-        .. code-block:: python
-
-            # TODO: Example output.
-
-        .. code-block:: python
 
             stream = llm.stream(messages)
 
@@ -109,11 +297,7 @@ class ChatWriter(BaseChatModel):
 
                 full += chunk
 
-            full
-
         .. code-block:: python
-
-            # TODO: Example output.
 
     Async:
         .. code-block:: python
@@ -131,8 +315,6 @@ class ChatWriter(BaseChatModel):
             await llm.abatch([messages])
 
         .. code-block:: python
-
-            # TODO: Example output.
 
     Tool calling:
         .. code-block:: python
@@ -162,8 +344,6 @@ class ChatWriter(BaseChatModel):
 
         .. code-block:: python
 
-              # TODO: Example output.
-
         See ``ChatWriter.bind_tools()`` method for more.
 
     Structured output:
@@ -191,8 +371,6 @@ class ChatWriter(BaseChatModel):
 
         .. code-block:: python
 
-            # TODO: Example output.
-
         See ``ChatWriter.with_structured_output()`` for more.
 
     Token usage:
@@ -204,22 +382,14 @@ class ChatWriter(BaseChatModel):
 
         .. code-block:: python
 
-            {'input_tokens': 28, 'output_tokens': 5, 'total_tokens': 33}
-
     Logprobs:
         .. code-block:: python
 
-            # TODO: Replace with appropriate bind arg.
-
-            logprobs_llm = llm.bind(logprobs=True)
-
-            ai_msg = logprobs_llm.invoke(messages)
+            ai_msg = logprobs_llm.invoke(messages, logprobs=True)
 
             ai_msg.response_metadata["logprobs"]
 
         .. code-block:: python
-
-              # TODO: Example output.
 
     Response metadata
         .. code-block:: python
@@ -230,9 +400,7 @@ class ChatWriter(BaseChatModel):
 
         .. code-block:: python
 
-             # TODO: Example output.
-
-    """  # noqa: E501
+    """
 
     client: Writer = Field(default=None, exclude=True)  #: :meta private:
     async_client: AsyncWriter = Field(default=None, exclude=True)  #: :meta private:
@@ -353,6 +521,7 @@ class ChatWriter(BaseChatModel):
         generations = []
         if not isinstance(response, dict):
             response = response.model_dump()
+
         token_usage = response.get("usage", {})
         for res in response["choices"]:
             message = convert_dict_to_message(res["message"])
@@ -370,6 +539,7 @@ class ChatWriter(BaseChatModel):
                 generation_info=generation_info,
             )
             generations.append(gen)
+
         llm_output = {
             "token_usage": token_usage,
             "model_name": self.model_name,
@@ -416,17 +586,8 @@ class ChatWriter(BaseChatModel):
         for chunk in response:
             if len(chunk.choices) == 0:
                 continue
-            message_chunk = convert_dict_chunk_to_message_chunk(chunk)
-            generation_info = {}
-            if finish_reason := chunk.choices[0].finish_reason:
-                generation_info["finish_reason"] = finish_reason
-            if logprobs := chunk.choices[0].logprobs:
-                generation_info["logprobs"] = logprobs
-            generation_chunk = ChatGenerationChunk(
-                message=message_chunk,
-                generation_info=generation_info,
-            )
 
+            generation_chunk, logprobs = create_chat_generation_chunk(chunk)
             if run_manager:
                 run_manager.on_llm_new_token(
                     generation_chunk.text, chunk=generation_chunk, logprobs=logprobs
@@ -448,17 +609,8 @@ class ChatWriter(BaseChatModel):
         async for chunk in response:
             if len(chunk.choices) == 0:
                 continue
-            message_chunk = convert_dict_chunk_to_message_chunk(chunk)
-            generation_info = {}
-            if finish_reason := chunk.choices[0].finish_reason:
-                generation_info["finish_reason"] = finish_reason
-            if logprobs := chunk.choices[0].logprobs:
-                generation_info["logprobs"] = logprobs
-            generation_chunk = ChatGenerationChunk(
-                message=message_chunk,
-                generation_info=generation_info,
-            )
 
+            generation_chunk, logprobs = create_chat_generation_chunk(chunk)
             if run_manager:
                 await run_manager.on_llm_new_token(
                     generation_chunk.text, chunk=generation_chunk, logprobs=logprobs
@@ -493,11 +645,37 @@ class ChatWriter(BaseChatModel):
 
         return super().bind(tools=formatted_tools, **kwargs)
 
-    # def with_structured_output(
-    #     self,
-    #     schema: Optional[Union[Dict, Type[BaseModel]]] = None,
-    #     *,
-    #     method: Literal["function_calling", "json_mode"] = "function_calling",
-    #     include_raw: bool = False,
-    #     **kwargs: Any,
-    # ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]: ...
+    def _combine_llm_outputs(self, llm_outputs: List[Optional[dict]]) -> dict:
+        overall_token_usage: dict = {}
+        system_fingerprint = None
+        model_name = None
+        for output in llm_outputs:
+            if output is None:
+                continue
+            token_usage = output["token_usage"]
+            if token_usage is not None:
+                for k, v in token_usage.items():
+                    if v:
+                        if k in overall_token_usage:
+                            overall_token_usage[k] += v
+                        else:
+                            overall_token_usage[k] = v
+            if system_fingerprint is None:
+                system_fingerprint = output.get("system_fingerprint")
+            if model_name is None:
+                model_name = output.get("model_name")
+        combined = {"token_usage": overall_token_usage}
+        if system_fingerprint:
+            combined["system_fingerprint"] = system_fingerprint
+        if model_name:
+            combined["model_name"] = model_name
+        return combined
+
+    def with_structured_output(
+        self,
+        schema: Optional[Union[Dict, Type[BaseModel]]] = None,
+        *,
+        method: Literal["function_calling", "json_mode"] = "function_calling",
+        include_raw: bool = False,
+        **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]: ...
