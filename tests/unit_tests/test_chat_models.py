@@ -1,4 +1,4 @@
-"""Integration tests ChatWriter wrapper
+"""Unit tests ChatWriter wrapper
 
 You need WRITER_API_KEY set in your environment to run these tests.
 """
@@ -13,9 +13,10 @@ from langchain_writer import ChatWriter
 
 def keep_api_key(func):
     def keep_api_key_wrapper(*args, **kwargs):
-        current_key = os.environ["WRITER_API_KEY"]
+        current_key = os.getenv("WRITER_API_KEY")
         func(*args, **kwargs)
-        os.environ["WRITER_API_KEY"] = current_key
+        if current_key:
+            os.environ["WRITER_API_KEY"] = current_key
 
     return keep_api_key_wrapper
 

@@ -93,7 +93,9 @@ def test_invoke(chat_writer: ChatWriter):
 
 
 def test_response_metadata(chat_writer: ChatWriter):
-    result = chat_writer.invoke([HumanMessage(content="How to how?")], logprobs=True)
+    result = chat_writer.invoke(
+        [HumanMessage(content="How to sleep well?")], logprobs=True
+    )
     assert result.response_metadata
     assert all(
         k in result.response_metadata
@@ -275,7 +277,7 @@ async def test_async_generation_with_n(chat_writer: ChatWriter):
 @pytest.mark.asyncio
 async def test_async_response_metadata(chat_writer: ChatWriter):
     result = await chat_writer.ainvoke(
-        [HumanMessage(content="How to how?")], logprobs=True
+        [HumanMessage(content="How to sleep well?")], logprobs=True
     )
     assert result.response_metadata
     assert all(
@@ -324,7 +326,7 @@ def test_streaming_stop(chat_writer: ChatWriter):
 
 def test_response_metadata_streaming(chat_writer: ChatWriter):
     full: Optional[BaseMessageChunk] = None
-    for chunk in chat_writer.stream("How to how?", logprobs=True):
+    for chunk in chat_writer.stream("How to sleep well?", logprobs=True):
         assert isinstance(chunk.content, str)
         full = chunk if full is None else full + chunk
     assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata

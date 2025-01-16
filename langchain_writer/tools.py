@@ -2,90 +2,142 @@
 
 from typing import Optional, Type
 
-from langchain_core.callbacks import CallbackManagerForToolRun
+from langchain_core.callbacks import (
+    AsyncCallbackManagerForToolRun,
+    CallbackManagerForToolRun,
+)
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field
+from langchain_core.utils import secret_from_env
+from pydantic import BaseModel, Field, SecretStr, model_validator
+from typing_extensions import Self
+from writerai import AsyncWriter, Writer
 
 
-class WriterToolInput(BaseModel):
-    """Input schema for Writer tool.
+class GraphToolInput(BaseModel):
+    """Input schema for Writer Knowledge Graph tool."""
 
-    This docstring is **not** part of what is sent to the model when performing tool
-    calling. The Field default values and descriptions **are** part of what is sent to
-    the model when performing tool calling.
-    """
-
-    # TODO: Add input args and descriptions.
-    a: int = Field(..., description="first number to add")
-    b: int = Field(..., description="second number to add")
+    question: str = Field(..., description="Question sent to graph.")
 
 
-class WriterTool(BaseTool):  # type: ignore[override]
-    """Writer tool.
+class GraphTool(BaseTool):  # type: ignore[override]
+    """Writer Knowledge Graph tool.
 
     Setup:
-        # TODO: Replace with relevant packages, env vars.
         Install ``langchain-writer`` and set environment variable ``WRITER_API_KEY``.
 
         .. code-block:: bash
 
             pip install -U langchain-writer
+
             export WRITER_API_KEY="your-api-key"
 
     Instantiation:
+
         .. code-block:: python
 
             tool = WriterTool(
-                # TODO: init params
+
+                graph_ids=["id1", "id2"],
+
+                subqueries=True
+
             )
 
     Invocation with args:
-        .. code-block:: python
-
-            # TODO: invoke args
-            tool.invoke({...})
 
         .. code-block:: python
 
-            # TODO: output of invocation
+            tool.invoke(question="")
+
+        .. code-block:: python
+
+            Question(
 
     Invocation with ToolCall:
 
         .. code-block:: python
 
-            # TODO: invoke args
-            tool.invoke({"args": {...}, "id": "1", "name": tool.name, "type": "tool_call"})
+            tool.invoke(
+                {
+                    "args": {"question": "How to stay healthy?"},
+                    "id": "1",
+                    "name": tool.name,
+                    "type": "tool_call"
+                }
+            )
 
         .. code-block:: python
+    """
 
-            # TODO: output of invocation
-    """  # noqa: E501
-
-    # TODO: Set tool name and description
-    name: str = "TODO: Tool name"
     """The name that is passed to the model when performing tool calling."""
-    description: str = "TODO: Tool description."
+    name: str = "Knowledge graph"
+
     """The description that is passed to the model when performing tool calling."""
-    args_schema: Type[BaseModel] = WriterToolInput
+    description: str = (
+        "Graph of files from which model can fetch data to compose response on user request."
+    )
+
     """The schema that is passed to the model when performing tool calling."""
+    args_schema: Type[BaseModel] = GraphToolInput
 
-    # TODO: Add any other init params for the tool.
-    # param1: Optional[str]
-    # """param1 determines foobar"""
+    client: Writer = Field(default=None, exclude=True)  #: :meta private:
+    async_client: AsyncWriter = Field(default=None, exclude=True)  #: :meta private:
 
-    # TODO: Replaced (a, b) with real tool arguments.
+    """Writer API key.
+    Automatically read from env variable `WRITER_API_KEY` if not provided.
+    """
+    api_key: SecretStr = Field(
+        default_factory=secret_from_env(
+            "WRITER_API_KEY",
+            error_message=(
+                "You must specify an api key. "
+                "You can pass it an argument as `api_key=...` or "
+                "set the environment variable `WRITER_API_KEY`."
+            ),
+        ),
+    )
+
+    """list of grap ids to handle request"""
+    graph_ids: list[str]
+
+    """Whether include the subqueries used by Palmyra in the response"""
+    subqueries: bool = Field(default=False)
+
+    @model_validator(mode="after")
+    def validate_environment(self) -> Self:
+        """Validate that api key exists in environment."""
+
+        api_key = self.api_key.get_secret_value() if self.api_key else None
+
+        if not self.client:
+            self.client = Writer(api_key=api_key)
+        if not self.async_client:
+            self.async_client = AsyncWriter(api_key=api_key)
+        return self
+
     def _run(
-        self, a: int, b: int, *, run_manager: Optional[CallbackManagerForToolRun] = None
-    ) -> str:
-        return str(a + b + 80)
+        self, question: str, *, run_manager: Optional[CallbackManagerForToolRun] = None
+    ) -> dict:
+        response = self.client.graphs.question(
+            graph_ids=self.graph_ids,
+            question=question,
+            stream=False,
+            subqueries=self.subqueries,
+        )
+        dict_response = response.model_dump()
+        return dict_response
 
-    # TODO: Implement if tool has native async functionality, otherwise delete.
-
-    # async def _arun(
-    #     self,
-    #     a: int,
-    #     b: int,
-    #     *,
-    #     run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
-    # ) -> str:
-    #     ...
+    async def _arun(
+        self,
+        question: str,
+        *,
+        run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
+    ) -> dict:
+        response = await self.async_client.graphs.question(
+            graph_ids=self.graph_ids,
+            question=question,
+            stream=False,
+            subqueries=self.subqueries,
+        )
+        dict_response = response.model_dump()
+        return dict_response

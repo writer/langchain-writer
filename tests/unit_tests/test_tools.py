@@ -1,28 +1,38 @@
-from typing import Type
+"""Unit tests Writer Graph Tool wrapper
 
-from langchain_tests.unit_tests import ToolsUnitTests
+You need WRITER_API_KEY set in your environment to run these tests.
+"""
 
-from langchain_writer.tools import WriterTool
+import os
+
+import pytest
+from pydantic import SecretStr
+
+from langchain_writer.tools import GraphTool
+from tests.unit_tests.test_chat_models import keep_api_key
 
 
-class TestParrotMultiplyToolUnit(ToolsUnitTests):
-    @property
-    def tool_constructor(self) -> Type[WriterTool]:
-        return WriterTool
+@keep_api_key
+def test_graph_tool_api_key_in_env():
+    os.environ["WRITER_API_KEY"] = "API key"
 
-    @property
-    def tool_constructor_params(self) -> dict:
-        # if your tool constructor instead required initialization arguments like
-        # `def __init__(self, some_arg: int):`, you would return those here
-        # as a dictionary, e.g.: `return {'some_arg': 42}`
-        return {}
+    tool = GraphTool(graph_ids=["id1", "id2"])
 
-    @property
-    def tool_invoke_params_example(self) -> dict:
-        """
-        Returns a dictionary representing the "args" of an example tool call.
+    assert tool.api_key.get_secret_value() == "API key"
 
-        This should NOT be a ToolCall dict - i.e. it should not
-        have {"name", "id", "args"} keys.
-        """
-        return {"a": 2, "b": 3}
+
+@keep_api_key
+def test_graph_tool_api_key_not_in_env_error():
+    os.environ.pop("WRITER_API_KEY", None)
+
+    with pytest.raises(ValueError):
+        GraphTool(graph_ids=["id1", "id2"])
+
+
+@keep_api_key
+def test_graph_tool_api_key_not_in_env_success():
+    os.environ.pop("WRITER_API_KEY", None)
+
+    tool = GraphTool(api_key=SecretStr("API key"), graph_ids=["id1", "id2"])
+
+    assert tool.api_key.get_secret_value() == "API key"

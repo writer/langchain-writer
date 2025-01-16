@@ -1,28 +1,68 @@
-from typing import Type
+"""Integration tests Writer Graph Tool wrapper
 
-from langchain_tests.integration_tests import ToolsIntegrationTests
+You need WRITER_API_KEY set in your environment
+and fill GRAPH_IDS variable to run these tests.
+"""
 
-from langchain_writer.tools import WriterTool
+import json
+
+import pytest
+from langchain_core.messages import ToolMessage
+
+from langchain_writer.tools import GraphTool
+
+GRAPH_IDS = ["id1", "id2"]
 
 
-class TestParrotMultiplyToolIntegration(ToolsIntegrationTests):
-    @property
-    def tool_constructor(self) -> Type[WriterTool]:
-        return WriterTool
+def test_invoke_directly(graph_tool: GraphTool):
+    response = graph_tool.invoke({"question": "How to improve my physical conditions?"})
 
-    @property
-    def tool_constructor_params(self) -> dict:
-        # if your tool constructor instead required initialization arguments like
-        # `def __init__(self, some_arg: int):`, you would return those here
-        # as a dictionary, e.g.: `return {'some_arg': 42}`
-        return {}
+    assert isinstance(response, dict)
+    assert isinstance(response["answer"], str)
+    assert len(response["answer"]) > 0
 
-    @property
-    def tool_invoke_params_example(self) -> dict:
-        """
-        Returns a dictionary representing the "args" of an example tool call.
 
-        This should NOT be a ToolCall dict - i.e. it should not
-        have {"name", "id", "args"} keys.
-        """
-        return {"a": 2, "b": 3}
+@pytest.mark.asyncio
+async def test_async_invoke_directly(graph_tool: GraphTool):
+    response = await graph_tool.ainvoke(
+        {"question": "How to improve my physical conditions?"}
+    )
+
+    assert isinstance(response, dict)
+    assert isinstance(response["answer"], str)
+    assert len(response["answer"]) > 0
+
+
+def test_invoke_tool_call(graph_tool: GraphTool):
+    model_generated_tool_call = {
+        "args": {
+            "question": "How to improve my physical conditions?",
+        },
+        "id": "id",
+        "name": graph_tool.name,
+        "type": "tool_call",
+    }
+    response = graph_tool.invoke(model_generated_tool_call)
+
+    assert isinstance(response, ToolMessage)
+    content = json.loads(response.content)
+    assert isinstance(content["answer"], str)
+    assert len(content["answer"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_async_invoke_tool_call(graph_tool: GraphTool):
+    model_generated_tool_call = {
+        "args": {
+            "question": "How to improve my physical conditions?",
+        },
+        "id": "id",
+        "name": graph_tool.name,
+        "type": "tool_call",
+    }
+    response = await graph_tool.ainvoke(model_generated_tool_call)
+
+    assert isinstance(response, ToolMessage)
+    content = json.loads(response.content)
+    assert isinstance(content["answer"], str)
+    assert len(content["answer"]) > 0

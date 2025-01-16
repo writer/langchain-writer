@@ -1,8 +1,7 @@
 from importlib import metadata
 
 from langchain_writer.chat_models import ChatWriter
-from langchain_writer.toolkits import WriterToolkit
-from langchain_writer.tools import WriterTool
+from langchain_writer.tools import GraphTool
 
 try:
     __version__ = metadata.version(__package__)
@@ -13,7 +12,6 @@ del metadata  # optional, avoids polluting the results of dir(__package__)
 
 __all__ = [
     "ChatWriter",
-    "WriterToolkit",
-    "WriterTool",
+    "GraphTool",
     "__version__",
 ]

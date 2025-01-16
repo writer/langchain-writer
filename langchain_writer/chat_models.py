@@ -109,9 +109,9 @@ def convert_dict_to_message(response_message: dict) -> BaseMessage:
         return HumanMessage(content=content)
     elif role == "assistant":
         additional_kwargs = {}
-
         tool_calls = []
         invalid_tool_calls = []
+
         if raw_tool_calls := response_message.get("tool_calls", []):
             additional_kwargs["tool_calls"] = raw_tool_calls
             for raw_tool_call in raw_tool_calls:
@@ -670,12 +670,3 @@ class ChatWriter(BaseChatModel):
         if model_name:
             combined["model_name"] = model_name
         return combined
-
-    def with_structured_output(
-        self,
-        schema: Optional[Union[Dict, Type[BaseModel]]] = None,
-        *,
-        method: Literal["function_calling", "json_mode"] = "function_calling",
-        include_raw: bool = False,
-        **kwargs: Any,
-    ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]: ...
