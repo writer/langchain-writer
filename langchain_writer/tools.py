@@ -7,10 +7,9 @@ from langchain_core.callbacks import (
     CallbackManagerForToolRun,
 )
 from langchain_core.tools import BaseTool
-from langchain_core.utils import secret_from_env
-from pydantic import BaseModel, Field, SecretStr, model_validator
-from typing_extensions import Self
-from writerai import AsyncWriter, Writer
+from pydantic import BaseModel, Field
+
+from langchain_writer.base import BaseWriter
 
 
 class GraphToolInput(BaseModel):
@@ -19,7 +18,7 @@ class GraphToolInput(BaseModel):
     question: str = Field(..., description="Question sent to graph.")
 
 
-class GraphTool(BaseTool):  # type: ignore[override]
+class GraphTool(BaseTool, BaseWriter):
     """Writer Knowledge Graph tool.
 
     Setup:
@@ -80,40 +79,11 @@ class GraphTool(BaseTool):  # type: ignore[override]
     """The schema that is passed to the model when performing tool calling."""
     args_schema: Type[BaseModel] = GraphToolInput
 
-    client: Writer = Field(default=None, exclude=True)  #: :meta private:
-    async_client: AsyncWriter = Field(default=None, exclude=True)  #: :meta private:
-
-    """Writer API key.
-    Automatically read from env variable `WRITER_API_KEY` if not provided.
-    """
-    api_key: SecretStr = Field(
-        default_factory=secret_from_env(
-            "WRITER_API_KEY",
-            error_message=(
-                "You must specify an api key. "
-                "You can pass it an argument as `api_key=...` or "
-                "set the environment variable `WRITER_API_KEY`."
-            ),
-        ),
-    )
-
     """list of grap ids to handle request"""
     graph_ids: list[str]
 
     """Whether include the subqueries used by Palmyra in the response"""
     subqueries: bool = Field(default=False)
-
-    @model_validator(mode="after")
-    def validate_environment(self) -> Self:
-        """Validate that api key exists in environment."""
-
-        api_key = self.api_key.get_secret_value() if self.api_key else None
-
-        if not self.client:
-            self.client = Writer(api_key=api_key)
-        if not self.async_client:
-            self.async_client = AsyncWriter(api_key=api_key)
-        return self
 
     def _run(
         self, question: str, *, run_manager: Optional[CallbackManagerForToolRun] = None
