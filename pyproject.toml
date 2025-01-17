@@ -21,8 +21,8 @@ disallow_untyped_defs = "True"
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 langchain-core = "^0.3.15"
-writer = "^0.8.2"
-instructor = "^1.7.2"
+writer-sdk = "^1.6.1"
+langchain-text-splitters = "^0.3.5"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "T201"]
@@ -43,16 +43,8 @@ optional = true
 [tool.poetry.group.codespell]
 optional = true
 
-[tool.poetry.group.test_integration]
-optional = true
-
 [tool.poetry.group.lint]
 optional = true
-
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.3"
@@ -63,8 +55,6 @@ langchain-tests = "^0.3.5"
 
 [tool.poetry.group.codespell.dependencies]
 codespell = "^2.2.6"
-
-[tool.poetry.group.test_integration.dependencies]
 
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.5"

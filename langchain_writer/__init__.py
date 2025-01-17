@@ -1,6 +1,7 @@
 from importlib import metadata
 
 from langchain_writer.chat_models import ChatWriter
+from langchain_writer.text_splitter import WriterTextSplitter
 from langchain_writer.tools import GraphTool
 
 try:
@@ -13,5 +14,6 @@ del metadata  # optional, avoids polluting the results of dir(__package__)
 __all__ = [
     "ChatWriter",
     "GraphTool",
+    "WriterTextSplitter",
     "__version__",
 ]

@@ -18,7 +18,7 @@ class GraphToolInput(BaseModel):
     question: str = Field(..., description="Question sent to graph.")
 
 
-class GraphTool(BaseTool, BaseWriter):
+class GraphTool(BaseWriter, BaseTool):
     """Writer Knowledge Graph tool.
 
     Setup:
@@ -27,7 +27,6 @@ class GraphTool(BaseTool, BaseWriter):
         .. code-block:: bash
 
             pip install -U langchain-writer
-
             export WRITER_API_KEY="your-api-key"
 
     Instantiation:
@@ -35,11 +34,8 @@ class GraphTool(BaseTool, BaseWriter):
         .. code-block:: python
 
             tool = WriterTool(
-
                 graph_ids=["id1", "id2"],
-
                 subqueries=True
-
             )
 
     Invocation with args:
@@ -49,8 +45,6 @@ class GraphTool(BaseTool, BaseWriter):
             tool.invoke(question="")
 
         .. code-block:: python
-
-            Question(
 
     Invocation with ToolCall:
 

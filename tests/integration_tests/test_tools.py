@@ -11,10 +11,10 @@ from langchain_core.messages import ToolMessage
 
 from langchain_writer.tools import GraphTool
 
-GRAPH_IDS = ["id1", "id2"]
+GRAPH_IDS = []
 
 
-def test_invoke_directly(graph_tool: GraphTool):
+def test_graph_tool_invoke_directly(graph_tool: GraphTool):
     response = graph_tool.invoke({"question": "How to improve my physical conditions?"})
 
     assert isinstance(response, dict)
@@ -23,7 +23,7 @@ def test_invoke_directly(graph_tool: GraphTool):
 
 
 @pytest.mark.asyncio
-async def test_async_invoke_directly(graph_tool: GraphTool):
+async def test_graph_tool_async_invoke_directly(graph_tool: GraphTool):
     response = await graph_tool.ainvoke(
         {"question": "How to improve my physical conditions?"}
     )
@@ -33,7 +33,7 @@ async def test_async_invoke_directly(graph_tool: GraphTool):
     assert len(response["answer"]) > 0
 
 
-def test_invoke_tool_call(graph_tool: GraphTool):
+def test_graph_tool_invoke_tool_call(graph_tool: GraphTool):
     model_generated_tool_call = {
         "args": {
             "question": "How to improve my physical conditions?",
@@ -51,7 +51,7 @@ def test_invoke_tool_call(graph_tool: GraphTool):
 
 
 @pytest.mark.asyncio
-async def test_async_invoke_tool_call(graph_tool: GraphTool):
+async def test_graph_tool_async_invoke_tool_call(graph_tool: GraphTool):
     model_generated_tool_call = {
         "args": {
             "question": "How to improve my physical conditions?",

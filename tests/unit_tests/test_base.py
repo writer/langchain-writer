@@ -22,7 +22,7 @@ def keep_api_key(func):
 
 
 @keep_api_key
-def test_chat_writer_api_key_in_env():
+def test_api_key_in_env():
     os.environ["WRITER_API_KEY"] = "API key"
 
     chat = ChatWriter()
@@ -31,7 +31,7 @@ def test_chat_writer_api_key_in_env():
 
 
 @keep_api_key
-def test_chat_writer_api_key_not_in_env_error():
+def test_api_key_not_in_env_error():
     os.environ.pop("WRITER_API_KEY", None)
 
     with pytest.raises(ValueError):
@@ -39,7 +39,7 @@ def test_chat_writer_api_key_not_in_env_error():
 
 
 @keep_api_key
-def test_chat_writer_api_key_not_in_env_success():
+def test_api_key_not_in_env_success():
     os.environ.pop("WRITER_API_KEY", None)
 
     chat = ChatWriter(api_key=SecretStr("API key"))
@@ -47,7 +47,7 @@ def test_chat_writer_api_key_not_in_env_success():
     assert chat.api_key.get_secret_value() == "API key"
 
 
-def test_chat_writer_params_validation():
+def test_params_validation():
     params = {"temperature": 1.5, "max_tokens": -1}
 
     with pytest.raises(ValueError):

@@ -57,7 +57,7 @@ def convert_message_to_dict(message: BaseMessage) -> dict:
         The dictionary.
     """
 
-    message_dict = {"role": "", "content": message.content}
+    message_dict = {"role": "", "content": format_message_content(message.content)}
 
     if isinstance(message, ChatMessage):
         message_dict["role"] = message.role
@@ -230,7 +230,27 @@ def create_chat_generation_chunk(
     return generation_chunk, logprobs
 
 
-class ChatWriter(BaseChatModel, BaseWriter):
+def format_message_content(content: Any) -> str:
+    if content and isinstance(content, list):
+        formatted_content = ""
+        for block in content:
+            if (
+                isinstance(block, dict)
+                and "type" in block
+                and block["type"] == "tool_use"
+            ):
+                continue
+            elif (
+                isinstance(block, dict) and "type" in block and block["type"] == "text"
+            ):
+                formatted_content += f" {block['text']}"
+    else:
+        formatted_content = content
+
+    return formatted_content
+
+
+class ChatWriter(BaseWriter, BaseChatModel):
     """`Writer` chat model integration.
 
     Setup:
@@ -248,19 +268,12 @@ class ChatWriter(BaseChatModel, BaseWriter):
             from langchain_writer import ChatWriter
 
             llm = ChatWriter(
-
                 model="...",
-
                 temperature=0,
-
                 max_tokens=None,
-
                 timeout=None,
-
                 max_retries=2,
-
                 api_key="...",
-
                 other params...
 
             )
@@ -269,11 +282,8 @@ class ChatWriter(BaseChatModel, BaseWriter):
         .. code-block:: python
 
             messages = [
-
                 ("system", "You are a helpful translator. Translate the user sentence to French."),
-
                 ("human", "I love programming."),
-
             ]
 
             llm.invoke(messages)
@@ -284,16 +294,11 @@ class ChatWriter(BaseChatModel, BaseWriter):
         .. code-block:: python
 
             for chunk in llm.stream(messages):
-
                 print(chunk)
 
-
             stream = llm.stream(messages)
-
             full = next(stream)
-
             for chunk in stream:
-
                 full += chunk
 
         .. code-block:: python
@@ -303,14 +308,10 @@ class ChatWriter(BaseChatModel, BaseWriter):
 
             await llm.ainvoke(messages)
 
-
             stream:
-
             async for chunk in (await llm.astream(messages))
 
-
             batch:
-
             await llm.abatch([messages])
 
         .. code-block:: python
@@ -320,25 +321,16 @@ class ChatWriter(BaseChatModel, BaseWriter):
 
             from pydantic import BaseModel, Field
 
-
             class GetWeather(BaseModel):
-
                 '''Get the current weather in a given location'''
-
                 location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
-
 
             class GetPopulation(BaseModel):
-
                 '''Get the current population in a given location'''
-
                 location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
 
-
             llm_with_tools = llm.bind_tools([GetWeather, GetPopulation])
-
             ai_msg = llm_with_tools.invoke("Which city is hotter today and which is bigger: LA or NY?")
-
             ai_msg.tool_calls
 
         .. code-block:: python
@@ -349,23 +341,15 @@ class ChatWriter(BaseChatModel, BaseWriter):
         .. code-block:: python
 
             from typing import Optional
-
             from pydantic import BaseModel, Field
 
-
             class Joke(BaseModel):
-
                 '''Joke to tell user.'''
-
                 setup: str = Field(description="The setup of the joke")
-
                 punchline: str = Field(description="The punchline to the joke")
-
                 rating: Optional[int] = Field(description="How funny the joke is, from 1 to 10")
 
-
             structured_llm = llm.with_structured_output(Joke)
-
             structured_llm.invoke("Tell me a joke about cats")
 
         .. code-block:: python
@@ -376,7 +360,6 @@ class ChatWriter(BaseChatModel, BaseWriter):
         .. code-block:: python
 
             ai_msg = llm.invoke(messages)
-
             ai_msg.usage_metadata
 
         .. code-block:: python
@@ -385,7 +368,6 @@ class ChatWriter(BaseChatModel, BaseWriter):
         .. code-block:: python
 
             ai_msg = logprobs_llm.invoke(messages, logprobs=True)
-
             ai_msg.response_metadata["logprobs"]
 
         .. code-block:: python
@@ -394,7 +376,6 @@ class ChatWriter(BaseChatModel, BaseWriter):
         .. code-block:: python
 
             ai_msg = llm.invoke(messages)
-
             ai_msg.response_metadata
 
         .. code-block:: python

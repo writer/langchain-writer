@@ -76,7 +76,7 @@ class GetPopulation(BaseModel):
     location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
 
 
-def test_tool_binding(chat_writer: ChatWriter):
+def test_chat_model_tool_binding(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points]
     )
@@ -85,14 +85,14 @@ def test_tool_binding(chat_writer: ChatWriter):
     assert len(chat_with_tools.kwargs["tools"]) == 2
 
 
-def test_invoke(chat_writer: ChatWriter):
+def test_chat_model_invoke(chat_writer: ChatWriter):
     response = chat_writer.invoke("Hello")
 
     assert isinstance(response, AIMessage)
     assert len(response.content) > 0
 
 
-def test_response_metadata(chat_writer: ChatWriter):
+def test_chat_model_response_metadata(chat_writer: ChatWriter):
     result = chat_writer.invoke(
         [HumanMessage(content="How to sleep well?")], logprobs=True
     )
@@ -109,20 +109,20 @@ def test_response_metadata(chat_writer: ChatWriter):
     )
 
 
-def test_invoke_stop(chat_writer: ChatWriter):
+def test_chat_model_invoke_stop(chat_writer: ChatWriter):
     response = chat_writer.invoke("Hello", stop=[" "])
 
     assert response.content[-1] == " "
 
 
-def test_llm_output_contains_model_name(chat_writer: ChatWriter):
+def test_chat_model_llm_output_contains_model_name(chat_writer: ChatWriter):
     message = HumanMessage(content="Hello")
     llm_result = chat_writer.generate([[message]])
     assert llm_result.llm_output is not None
     assert llm_result.llm_output["model_name"] == chat_writer.model_name
 
 
-def test_system_message(chat_writer: ChatWriter):
+def test_chat_model_system_message(chat_writer: ChatWriter):
     system_message = SystemMessage(content="Compose your responses in German language")
     user_message = HumanMessage(content="Hi! How can I can say 'Hi!' to other human?")
 
@@ -132,7 +132,7 @@ def test_system_message(chat_writer: ChatWriter):
     assert len(response.content) > 0
 
 
-def test_tool_calls(chat_writer: ChatWriter):
+def test_chat_model_tool_calls(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
@@ -149,7 +149,7 @@ def test_tool_calls(chat_writer: ChatWriter):
         ]
 
 
-def test_tool_call_pydantic_definition(chat_writer: ChatWriter):
+def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [GetWeather, GetPopulation], tool_choice="auto"
     )
@@ -163,7 +163,7 @@ def test_tool_call_pydantic_definition(chat_writer: ChatWriter):
         assert tool_call["name"] in ["GetWeather", "GetPopulation"]
 
 
-def test_tool_calls_choice(chat_writer: ChatWriter):
+def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
         tool_choice="get_laliga_points",
@@ -178,7 +178,7 @@ def test_tool_calls_choice(chat_writer: ChatWriter):
         assert call["name"] == "get_laliga_points"
 
 
-def test_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
+def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
@@ -202,7 +202,7 @@ def test_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
     assert len(response.content) > 0
 
 
-def test_generation_with_n(chat_writer: ChatWriter):
+def test_chat_model_generation_with_n(chat_writer: ChatWriter):
     chat_writer.n = 2
     message = HumanMessage(content="Hello")
     response = chat_writer.generate([[message], [message]])
@@ -217,7 +217,7 @@ def test_generation_with_n(chat_writer: ChatWriter):
             assert generation.text == generation.message.content
 
 
-def test_multiple_completions(chat_writer: ChatWriter):
+def test_chat_model_multiple_completions(chat_writer: ChatWriter):
     chat_writer.n = 5
     message = HumanMessage(content="Hello")
     response = chat_writer._generate([message])
@@ -228,7 +228,7 @@ def test_multiple_completions(chat_writer: ChatWriter):
         assert isinstance(generation.message.content, str)
 
 
-def test_batch(chat_writer: ChatWriter):
+def test_chat_model_batch(chat_writer: ChatWriter):
     response = chat_writer.batch(
         [
             "How to cook pancakes?",
@@ -244,7 +244,7 @@ def test_batch(chat_writer: ChatWriter):
 
 
 @pytest.mark.asyncio
-async def test_ainvoke(chat_writer: ChatWriter):
+async def test_chat_model_ainvoke(chat_writer: ChatWriter):
     response = await chat_writer.ainvoke("Hello")
 
     assert isinstance(response, AIMessage)
@@ -252,14 +252,14 @@ async def test_ainvoke(chat_writer: ChatWriter):
 
 
 @pytest.mark.asyncio
-async def test_ainvoke_stop(chat_writer: ChatWriter):
+async def test_chat_model_ainvoke_stop(chat_writer: ChatWriter):
     response = await chat_writer.ainvoke("Hello", stop=[" "])
 
     assert response.content[-1] == " "
 
 
 @pytest.mark.asyncio
-async def test_async_generation_with_n(chat_writer: ChatWriter):
+async def test_chat_model_async_generation_with_n(chat_writer: ChatWriter):
     chat_writer.n = 2
     message = HumanMessage(content="Hello")
     response = await chat_writer.agenerate([[message], [message]])
@@ -275,7 +275,7 @@ async def test_async_generation_with_n(chat_writer: ChatWriter):
 
 
 @pytest.mark.asyncio
-async def test_async_response_metadata(chat_writer: ChatWriter):
+async def test_chat_model_async_response_metadata(chat_writer: ChatWriter):
     result = await chat_writer.ainvoke(
         [HumanMessage(content="How to sleep well?")], logprobs=True
     )
@@ -293,7 +293,7 @@ async def test_async_response_metadata(chat_writer: ChatWriter):
 
 
 @pytest.mark.asyncio
-async def test_abatch(chat_writer: ChatWriter):
+async def test_chat_model_abatch(chat_writer: ChatWriter):
     response = await chat_writer.abatch(
         [
             "How to cook pancakes?",
@@ -308,12 +308,12 @@ async def test_abatch(chat_writer: ChatWriter):
         assert batch.content
 
 
-def test_streaming(chat_writer: ChatWriter):
+def test_chat_model_streaming(chat_writer: ChatWriter):
     for chunk in chat_writer.stream("Compose a tiny poem"):
         assert isinstance(chunk.content, str)
 
 
-def test_streaming_stop(chat_writer: ChatWriter):
+def test_chat_model_streaming_stop(chat_writer: ChatWriter):
     response = chat_writer.stream("Hello", stop=[" "])
     resulting_text = ""
 
@@ -324,7 +324,7 @@ def test_streaming_stop(chat_writer: ChatWriter):
     assert resulting_text[-1] == " "
 
 
-def test_response_metadata_streaming(chat_writer: ChatWriter):
+def test_chat_model_response_metadata_streaming(chat_writer: ChatWriter):
     full: Optional[BaseMessageChunk] = None
     for chunk in chat_writer.stream("How to sleep well?", logprobs=True):
         assert isinstance(chunk.content, str)
@@ -332,7 +332,7 @@ def test_response_metadata_streaming(chat_writer: ChatWriter):
     assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata
 
 
-def test_system_message_streaming(chat_writer: ChatWriter):
+def test_chat_model_system_message_streaming(chat_writer: ChatWriter):
     system_message = SystemMessage(content="Compose your responses in German language")
     user_message = HumanMessage(content="Hi! How can I can say 'Hi!' to other human?")
 
@@ -342,7 +342,7 @@ def test_system_message_streaming(chat_writer: ChatWriter):
         assert isinstance(chunk, AIMessageChunk)
 
 
-def test_tool_calls_streaming(chat_writer: ChatWriter):
+def test_chat_model_tool_calls_streaming(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
         tool_choice="get_laliga_points",
@@ -360,7 +360,7 @@ def test_tool_calls_streaming(chat_writer: ChatWriter):
             )
 
 
-def test_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter):
+def test_chat_model_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter):
     chat_with_tools = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
@@ -386,13 +386,13 @@ def test_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter):
 
 
 @pytest.mark.asyncio
-async def test_astreaming(chat_writer: ChatWriter):
+async def test_chat_model_astreaming(chat_writer: ChatWriter):
     async for chunk in chat_writer.astream("Compose a tiny poem"):
         assert isinstance(chunk.content, str)
 
 
 @pytest.mark.asyncio
-async def test_astreaming_stop(chat_writer: ChatWriter):
+async def test_chat_model_astreaming_stop(chat_writer: ChatWriter):
     response = chat_writer.astream("Hello", stop=[" "])
     resulting_text = ""
 
