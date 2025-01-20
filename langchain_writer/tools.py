@@ -19,7 +19,8 @@ class GraphToolInput(BaseModel):
 
 
 class GraphTool(BaseWriter, BaseTool):
-    """Writer Knowledge Graph tool.
+    """
+    Writer Knowledge Graph tool.
 
     Setup:
         Install ``langchain-writer`` and set environment variable ``WRITER_API_KEY``.
@@ -44,8 +45,6 @@ class GraphTool(BaseWriter, BaseTool):
 
             tool.invoke(question="")
 
-        .. code-block:: python
-
     Invocation with ToolCall:
 
         .. code-block:: python
@@ -59,7 +58,40 @@ class GraphTool(BaseWriter, BaseTool):
                 }
             )
 
-        .. code-block:: python
+    Returned dict sample:
+
+        .. code-block:: json
+
+            {
+                "answer": "Knowledge Graph text response",
+                "question": "Your sent question",
+                "sources": [
+                    {
+                        "file_id": "ID of file used by KG to compose an answer",
+                        "snippet": "File data snippet used by KG to compose an answer"
+                    },
+                    {
+                        "file_id": "Another ID of file used by KG to compose an answer",
+                        "snippet": "Another file data snippet used by KG to compose an answer"
+                    }
+                ],
+                "subqueries": [
+                    {
+                        "query": "Subquery question used by KG to compose a final answer",
+                        "answer": "Subquery answer used by KG to compose a final answer",
+                        "sources": [
+                            {
+                                "file_id": "ID of file used by KG in subquery to compose an answer",
+                                "snippet": "File data snippet used by KG in subquery to compose an answer"
+                            },
+                            {
+                                "file_id": "Another ID of file used by KG in subquery to compose an answer",
+                                "snippet": "Another file data snippet used by KG in subquery to compose an answer"
+                            }
+                        ]
+                    }
+                ]
+            }
     """
 
     """The name that is passed to the model when performing tool calling."""

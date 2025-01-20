@@ -1,6 +1,7 @@
 from importlib import metadata
 
 from langchain_writer.chat_models import ChatWriter
+from langchain_writer.pdf_parser import PDFParser
 from langchain_writer.text_splitter import WriterTextSplitter
 from langchain_writer.tools import GraphTool
 
@@ -15,5 +16,6 @@ __all__ = [
     "ChatWriter",
     "GraphTool",
     "WriterTextSplitter",
+    "PDFParser",
     "__version__",
 ]

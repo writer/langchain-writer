@@ -33,12 +33,9 @@ class WriterTextSplitter(BaseWriter, TextSplitter):
     Invoke:
         .. code-block:: python
 
-            messages = [
-                ("system", "You are a helpful translator. Translate the user sentence to French."),
-                ("human", "I love programming."),
-            ]
+            text_file = 'Veeeeeeeeeeery long text you want to split into smaller chunks.'
 
-            llm.invoke(messages)
+            splitter.split_text(text_file)
 
         .. code-block:: python
 
