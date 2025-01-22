@@ -19,7 +19,7 @@ from langchain_core.callbacks import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
 )
-from langchain_core.language_models import BaseChatModel, LanguageModelInput
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
@@ -40,7 +40,6 @@ from langchain_core.output_parsers.openai_tools import (
     parse_tool_call,
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
-from langchain_core.runnables import Runnable
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -111,15 +110,19 @@ def convert_dict_to_message(response_message: dict) -> BaseMessage:
         tool_calls = []
         invalid_tool_calls = []
 
-        if raw_tool_calls := response_message.get("tool_calls", []):
-            additional_kwargs["tool_calls"] = raw_tool_calls
-            for raw_tool_call in raw_tool_calls:
+        if raw_function_calls := response_message.get("tool_calls", []):
+            additional_kwargs["tool_calls"] = raw_function_calls
+            for raw_tool_call in raw_function_calls:
                 try:
                     tool_calls.append(parse_tool_call(raw_tool_call, return_id=True))
                 except Exception as e:
                     invalid_tool_calls.append(
                         dict(make_invalid_tool_call(raw_tool_call, str(e)))
                     )
+
+        if raw_graph_calls := response_message.get("graph_data", {}):
+            additional_kwargs["graph_data"] = raw_graph_calls
+
         return AIMessage(
             content=content,
             additional_kwargs=additional_kwargs,
@@ -188,6 +191,10 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
                     )
                 except KeyError:
                     pass
+
+        if raw_graph_calls := delta.get("graph_data", {}):
+            additional_kwargs["graph_data"] = raw_graph_calls
+
         return AIMessageChunk(
             content=content,
             additional_kwargs=additional_kwargs,
@@ -248,6 +255,28 @@ def format_message_content(content: Any) -> str:
         formatted_content = content
 
     return formatted_content
+
+
+def format_tool(
+    tool: Union[Dict[str, Any], Type[BaseModel], Callable]
+) -> dict[str, Any]:
+    dict_tool = {}
+    if isinstance(tool, BaseModel):
+        dict_tool = tool.model_dump()
+    elif tool:
+        dict_tool = tool.__dict__
+
+    if dict_tool.get("type") == "graph":
+        return {
+            "type": "graph",
+            "function": {
+                "description": dict_tool.get("description", ""),
+                "graph_ids": dict_tool.get("graph_ids", []),
+                "subqueries": dict_tool.get("subqueries", False),
+            },
+        }
+    else:
+        return convert_to_openai_tool(tool)
 
 
 class ChatWriter(BaseWriter, BaseChatModel):
@@ -319,42 +348,9 @@ class ChatWriter(BaseWriter, BaseChatModel):
     Tool calling:
         .. code-block:: python
 
-            from pydantic import BaseModel, Field
-
-            class GetWeather(BaseModel):
-                '''Get the current weather in a given location'''
-                location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
-
-            class GetPopulation(BaseModel):
-                '''Get the current population in a given location'''
-                location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
-
-            llm_with_tools = llm.bind_tools([GetWeather, GetPopulation])
-            ai_msg = llm_with_tools.invoke("Which city is hotter today and which is bigger: LA or NY?")
-            ai_msg.tool_calls
-
         .. code-block:: python
 
         See ``ChatWriter.bind_tools()`` method for more.
-
-    Structured output:
-        .. code-block:: python
-
-            from typing import Optional
-            from pydantic import BaseModel, Field
-
-            class Joke(BaseModel):
-                '''Joke to tell user.'''
-                setup: str = Field(description="The setup of the joke")
-                punchline: str = Field(description="The punchline to the joke")
-                rating: Optional[int] = Field(description="How funny the joke is, from 1 to 10")
-
-            structured_llm = llm.with_structured_output(Joke)
-            structured_llm.invoke("Tell me a joke about cats")
-
-        .. code-block:: python
-
-        See ``ChatWriter.with_structured_output()`` for more.
 
     Token usage:
         .. code-block:: python
@@ -403,6 +399,12 @@ class ChatWriter(BaseWriter, BaseChatModel):
     """Return logprobs or not"""
     logprobs: bool = Field(default=True)
 
+    """Tools to use by chat"""
+    tools: list[dict[str, Any]] = Field(default_factory=list)
+
+    """Tools selection mode"""
+    tool_choice: Union[Literal["none", "auto"], dict[str, Any]] = Field(default="auto")
+
     model_config = ConfigDict(
         populate_by_name=True,
     )
@@ -428,7 +430,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
     @property
     def _default_params(self) -> Dict[str, Any]:
         """Get the default parameters for calling Writer API."""
-        return {
+        params = {
             "model": self.model_name,
             "temperature": self.temperature,
             "n": self.n,
@@ -437,6 +439,9 @@ class ChatWriter(BaseWriter, BaseChatModel):
             "logprobs": self.logprobs,
             **self.model_kwargs,
         }
+        if self.tools:
+            params.update({"tools": self.tools, "tool_choice": self.tool_choice})
+        return params
 
     def _convert_messages_to_dicts(
         self, messages: List[BaseMessage], stop: Optional[List[str]] = None
@@ -555,10 +560,10 @@ class ChatWriter(BaseWriter, BaseChatModel):
         *,
         tool_choice: Optional[Union[str, Literal["auto", "none"]]] = None,
         **kwargs: Any,
-    ) -> Runnable[LanguageModelInput, BaseMessage]:
+    ) -> None:
         """Bind tools to the chat model.
 
-        Args:
+        Args:)
             tools: Tools to bind to the model
             tool_choice: Which tool to require ('auto', 'none', or specific tool name)
             **kwargs: Additional parameters to pass to the chat model
@@ -566,16 +571,13 @@ class ChatWriter(BaseWriter, BaseChatModel):
         Returns:
             A runnable that will use the tools
         """
-        formatted_tools = [convert_to_openai_tool(tool) for tool in tools]
-
+        self.tools = [format_tool(tool) for tool in tools]
         if tool_choice:
-            kwargs["tool_choice"] = (
-                (tool_choice)
+            self.tool_choice = (
+                tool_choice
                 if tool_choice in ("auto", "none")
                 else {"type": "function", "function": {"name": tool_choice}}
             )
-
-        return super().bind(tools=formatted_tools, **kwargs)
 
     def _combine_llm_outputs(self, llm_outputs: List[Optional[dict]]) -> dict:
         overall_token_usage: dict = {}

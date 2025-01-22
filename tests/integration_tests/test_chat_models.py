@@ -15,10 +15,10 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain_core.outputs import ChatGeneration, ChatResult, LLMResult
-from langchain_core.runnables import RunnableBinding
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from langchain_writer import GraphTool
 from langchain_writer.chat_models import ChatWriter
 
 
@@ -77,12 +77,14 @@ class GetPopulation(BaseModel):
 
 
 def test_chat_model_tool_binding(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
-        [get_supercopa_trophies_count, get_laliga_points]
-    )
+    chat_writer.bind_tools([get_supercopa_trophies_count, get_laliga_points])
 
-    assert isinstance(chat_with_tools, RunnableBinding)
-    assert len(chat_with_tools.kwargs["tools"]) == 2
+    assert len(chat_writer.tools) == 2
+    for chat_tool in chat_writer.tools:
+        assert chat_tool["function"]["name"] in [
+            "get_supercopa_trophies_count",
+            "get_laliga_points",
+        ]
 
 
 def test_chat_model_invoke(chat_writer: ChatWriter):
@@ -133,11 +135,11 @@ def test_chat_model_system_message(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
+    chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
 
-    response = chat_with_tools.invoke(
+    response = chat_writer.invoke(
         "Does Barcelona have more supercopa trophies than Real Madrid?"
     )
 
@@ -149,12 +151,21 @@ def test_chat_model_tool_calls(chat_writer: ChatWriter):
         ]
 
 
-def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
-        [GetWeather, GetPopulation], tool_choice="auto"
+def test_chat_model_tool_graph_call(chat_writer: ChatWriter, graph_tool: GraphTool):
+    chat_writer.bind_tools([graph_tool])
+
+    response = chat_writer.invoke(
+        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
     )
 
-    response = chat_with_tools.invoke(
+    assert response.additional_kwargs.get("graph_data")
+    assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+
+
+def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
+    chat_writer.bind_tools([GetWeather, GetPopulation], tool_choice="auto")
+
+    response = chat_writer.invoke(
         "Which city is hotter today and which is bigger: LA or NY?"
     )
 
@@ -164,12 +175,12 @@ def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
+    chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
         tool_choice="get_laliga_points",
     )
 
-    response = chat_with_tools.invoke(
+    response = chat_writer.invoke(
         "Does Barcelona have more supercopa trophies than Real Madrid?"
     )
 
@@ -179,13 +190,13 @@ def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
+    chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
     messages = [
         HumanMessage("Does Barcelona have more supercopa trophies than Real Madrid?")
     ]
-    response = chat_with_tools.invoke(messages)
+    response = chat_writer.invoke(messages)
     messages.append(response)
 
     for tool_call in response.tool_calls:
@@ -196,7 +207,7 @@ def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
         tool_msg = selected_tool.invoke(tool_call)
         messages.append(tool_msg)
 
-    response = chat_with_tools.invoke(messages)
+    response = chat_writer.invoke(messages)
 
     assert isinstance(response, AIMessage)
     assert len(response.content) > 0
@@ -256,6 +267,20 @@ async def test_chat_model_ainvoke_stop(chat_writer: ChatWriter):
     response = await chat_writer.ainvoke("Hello", stop=[" "])
 
     assert response.content[-1] == " "
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_graph_acall(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool])
+
+    response = await chat_writer.ainvoke(
+        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+    )
+
+    assert response.additional_kwargs.get("graph_data")
+    assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
 
 
 @pytest.mark.asyncio
@@ -343,12 +368,12 @@ def test_chat_model_system_message_streaming(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_streaming(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
+    chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
         tool_choice="get_laliga_points",
     )
 
-    response = chat_with_tools.stream(
+    response = chat_writer.stream(
         "Does Barcelona have more supercopa trophies than Real Madrid?"
     )
 
@@ -361,13 +386,13 @@ def test_chat_model_tool_calls_streaming(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter):
-    chat_with_tools = chat_writer.bind_tools(
+    chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
     messages = [
         HumanMessage("Does Barcelona have more supercopa trophies than Real Madrid?")
     ]
-    response = chat_with_tools.invoke(messages)
+    response = chat_writer.invoke(messages)
     messages.append(response)
 
     for tool_call in response.tool_calls:
@@ -378,11 +403,29 @@ def test_chat_model_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter
         tool_msg = selected_tool.invoke(tool_call)
         messages.append(tool_msg)
 
-    response = chat_with_tools.stream(messages)
+    response = chat_writer.stream(messages)
 
     for chunk in response:
         assert isinstance(chunk.content, str)
         assert len(chunk.id) > 0
+
+
+def test_chat_model_tool_graph_call_streaming(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool])
+
+    response = chat_writer.stream(
+        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("graph_data")
+    assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
 
 
 @pytest.mark.asyncio
@@ -401,3 +444,22 @@ async def test_chat_model_astreaming_stop(chat_writer: ChatWriter):
         assert isinstance(chunk.content, str)
 
     assert resulting_text[-1] == " "
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_graph_call_streaming_async(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool])
+
+    response = chat_writer.astream(
+        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("graph_data")
+    assert len(full.additional_kwargs["graph_data"]["sources"]) > 0

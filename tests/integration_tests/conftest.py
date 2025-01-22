@@ -3,7 +3,6 @@ from langchain_core.documents.base import Blob
 
 from langchain_writer import ChatWriter, GraphTool, WriterTextSplitter
 from langchain_writer.pdf_parser import PDFParser
-from tests.integration_tests.test_tools import GRAPH_IDS
 
 
 @pytest.fixture(scope="function")
@@ -13,7 +12,7 @@ def chat_writer():
 
 @pytest.fixture(scope="function")
 def graph_tool():
-    return GraphTool(graph_ids=GRAPH_IDS)
+    return GraphTool()
 
 
 @pytest.fixture(scope="function")
