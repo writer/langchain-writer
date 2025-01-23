@@ -76,6 +76,25 @@ class GetPopulation(BaseModel):
     location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
 
 
+get_product_info = {
+    "type": "function",
+    "function": {
+        "name": "get_product_info",
+        "description": "Get information about a product by its id",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "product_id": {
+                    "type": "number",
+                    "description": "The unique identifier of the product to retrieve information for",
+                }
+            },
+            "required": ["product_id"],
+        },
+    },
+}
+
+
 def test_chat_model_tool_binding(chat_writer: ChatWriter):
     chat_writer.bind_tools([get_supercopa_trophies_count, get_laliga_points])
 
@@ -162,6 +181,35 @@ def test_chat_model_tool_graph_call(chat_writer: ChatWriter, graph_tool: GraphTo
     assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
 
 
+def test_chat_model_tool_dict_definition_call(chat_writer: ChatWriter):
+    chat_writer.bind_tools([get_product_info])
+
+    response = chat_writer.invoke(
+        "How many sugar does cookie with id: 1243 have per 100 gram?"
+    )
+
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0]["name"] == "get_product_info"
+
+
+def test_chat_model_tool_graph_and_function_call(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+
+    response = chat_writer.invoke(
+        "Use knowledge graph tool to compose this answer. "
+        "Tell me what th first line of documents stored in your KG. "
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    assert response.additional_kwargs.get("graph_data")
+    assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
+
+
 def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
     chat_writer.bind_tools([GetWeather, GetPopulation], tool_choice="auto")
 
@@ -211,6 +259,55 @@ def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
 
     assert isinstance(response, AIMessage)
     assert len(response.content) > 0
+
+
+def test_chat_model_function_and_graph_calls_with_tools_outputs(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools(
+        [
+            get_supercopa_trophies_count,
+            get_laliga_points,
+            get_product_info,
+            GetWeather,
+            GetPopulation,
+            graph_tool,
+        ],
+        tool_choice="auto",
+    )
+    messages = [
+        HumanMessage(
+            "Use knowledge graph tool to compose this answer. "
+            "Tell me what th first line of documents stored in your KG. "
+            "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        )
+    ]
+    response = chat_writer.invoke(messages)
+    messages.append(response)
+
+    for tool_call in response.tool_calls:
+        selected_tool = {
+            "get_supercopa_trophies_count": get_supercopa_trophies_count,
+        }[tool_call["name"].lower()]
+        tool_msg = selected_tool.invoke(tool_call)
+        messages.append(tool_msg)
+
+    response = chat_writer.invoke(messages)
+
+    assert isinstance(response, AIMessage)
+    assert len(response.content) > 0
+    assert any(
+        [
+            word in response.content.lower()
+            for word in ["supercopa", "barcelona", "trophies", "15"]
+        ]
+    )
+    assert any(
+        [
+            word in response.content.lower()
+            for word in ["knowledge", "graph", "line", "document"]
+        ]
+    )
 
 
 def test_chat_model_generation_with_n(chat_writer: ChatWriter):
@@ -276,11 +373,30 @@ async def test_chat_model_tool_graph_acall(
     chat_writer.bind_tools([graph_tool])
 
     response = await chat_writer.ainvoke(
-        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+        "Use knowledge graph tool to compose this answer. "
+        "Tell me what th first line of documents stored in your KG"
     )
 
     assert response.additional_kwargs.get("graph_data")
     assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_graph_and_function_acall(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+
+    response = await chat_writer.ainvoke(
+        "Use knowledge graph tool to compose this answer. "
+        "Tell me what th first line of documents stored in your KG. "
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    assert response.additional_kwargs.get("graph_data")
+    assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
 
 
 @pytest.mark.asyncio
@@ -416,7 +532,8 @@ def test_chat_model_tool_graph_call_streaming(
     chat_writer.bind_tools([graph_tool])
 
     response = chat_writer.stream(
-        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+        "Use knowledge graph tool to compose this answer. "
+        "Tell me what th first line of documents stored in your KG"
     )
 
     full = next(response)
@@ -426,6 +543,28 @@ def test_chat_model_tool_graph_call_streaming(
     assert isinstance(full, AIMessageChunk)
     assert full.additional_kwargs.get("graph_data")
     assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
+
+
+def test_chat_model_tool_function_graph_call_streaming(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+
+    response = chat_writer.stream(
+        "Use knowledge graph tool to compose this answer. "
+        "Tell me what th first line of documents stored in your KG. "
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("graph_data")
+    assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
+    assert full.tool_calls
+    assert len(full.tool_calls) == 1
 
 
 @pytest.mark.asyncio
@@ -463,3 +602,27 @@ async def test_chat_model_tool_graph_call_streaming_async(
     assert isinstance(full, AIMessageChunk)
     assert full.additional_kwargs.get("graph_data")
     assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_function_graph_call_astreaming(
+    chat_writer: ChatWriter, graph_tool: GraphTool
+):
+    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+
+    response = chat_writer.astream(
+        "Use knowledge graph tool to compose this answer. "
+        "Tell me what th first line of documents stored in your KG. "
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("graph_data")
+    assert full.additional_kwargs.get("graph_data")["sources"]
+    assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
+    assert full.tool_calls
+    assert len(full.tool_calls) == 1

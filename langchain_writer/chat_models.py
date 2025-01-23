@@ -73,6 +73,10 @@ def convert_message_to_dict(message: BaseMessage) -> dict:
                 }
                 for tool in message.tool_calls
             ]
+
+        if graph_data := message.additional_kwargs.get("graph_data"):
+            message_dict["graph_data"] = graph_data
+
     elif isinstance(message, SystemMessage):
         message_dict["role"] = "system"
     elif isinstance(message, ToolMessage):
@@ -238,6 +242,15 @@ def create_chat_generation_chunk(
 
 
 def format_message_content(content: Any) -> str:
+    """Format Lang Chain message content. Sanitize if from unnecessary elements.
+
+    Args:
+        content: Lang Chain message content.
+
+    Returns:
+        Formatted content in string format.
+    """
+
     if content and isinstance(content, list):
         formatted_content = ""
         for block in content:
@@ -260,9 +273,20 @@ def format_message_content(content: Any) -> str:
 def format_tool(
     tool: Union[Dict[str, Any], Type[BaseModel], Callable]
 ) -> dict[str, Any]:
+    """Format tool and taking into consideration it's type e.g. 'function' or 'graph'.
+
+    Args:
+        tool: Tool to format.
+
+    Returns:
+        OpenAI typed dict with tool definition.
+    """
+
     dict_tool = {}
     if isinstance(tool, BaseModel):
         dict_tool = tool.model_dump()
+    elif isinstance(tool, dict):
+        dict_tool = tool
     elif tool:
         dict_tool = tool.__dict__
 
@@ -348,9 +372,26 @@ class ChatWriter(BaseWriter, BaseChatModel):
     Tool calling:
         .. code-block:: python
 
+        from langchain_writer.tools import GraphTool
+        from pydantic import BaseModel, Field
+
+        class GetWeather(BaseModel):
+            '''Get the current weather in a given location'''
+            location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
+
+        graph_tool = GraphTool(graph_ids=['id1', 'id2'])
+
+        !!Pay attention, that Writer tools binding modifies initial object
+        instead of creating a new one with binded tools!!
+        Moreover, besides 'function' WriterChat supports 'graph' tool type.
+        To use it pass GraphTool object from langchain_writer package
+        as one of tools list elements of bind_tools() function params.
+
+        llm.bind_tools([graph_tool, GetWeather])
+
         .. code-block:: python
 
-        See ``ChatWriter.bind_tools()`` method for more.
+        See ``ChatWriter.bind_tools()`` method for more.dict
 
     Token usage:
         .. code-block:: python
@@ -559,17 +600,15 @@ class ChatWriter(BaseWriter, BaseChatModel):
         tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable]],
         *,
         tool_choice: Optional[Union[str, Literal["auto", "none"]]] = None,
-        **kwargs: Any,
     ) -> None:
         """Bind tools to the chat model.
 
-        Args:)
+        Args:
             tools: Tools to bind to the model
             tool_choice: Which tool to require ('auto', 'none', or specific tool name)
-            **kwargs: Additional parameters to pass to the chat model
 
         Returns:
-            A runnable that will use the tools
+            None
         """
         self.tools = [format_tool(tool) for tool in tools]
         if tool_choice:

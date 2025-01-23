@@ -66,11 +66,13 @@ llm.batch(
 ```
 
 ### Tools binding
+
 ```python
 from langchain_writer import ChatWriter
 from langchain_core.tools import tool
 from typing import Optional
 from pydantic import BaseModel, Field
+
 
 @tool
 def get_supercopa_trophies_count(club_name: str) -> Optional[int]:
@@ -82,7 +84,7 @@ def get_supercopa_trophies_count(club_name: str) -> Optional[int]:
     Returns:
         Number of supercopa trophies or None if there is no info about requested club
     """
-    #Tool implementation
+    # Tool implementation
 
 
 class GetWeather(BaseModel):
@@ -90,9 +92,8 @@ class GetWeather(BaseModel):
 
     location: str = Field(..., description="The city and state, e.g. San Francisco, CA")
 
+
 llm = ChatWriter()
 
-llm_with_tools = llm.bind_tools(
-    [get_supercopa_trophies_count, GetWeather]
-)
+llm.bind_tools([get_supercopa_trophies_count, GetWeather])
 ```
