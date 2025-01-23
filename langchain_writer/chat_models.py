@@ -40,6 +40,7 @@ from langchain_core.output_parsers.openai_tools import (
     parse_tool_call,
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -285,10 +286,10 @@ def format_tool(
     dict_tool = {}
     if isinstance(tool, BaseModel):
         dict_tool = tool.model_dump()
+    elif isinstance(tool, BaseTool):
+        dict_tool = tool.__dict__
     elif isinstance(tool, dict):
         dict_tool = tool
-    elif tool:
-        dict_tool = tool.__dict__
 
     if dict_tool.get("type") == "graph":
         return {
