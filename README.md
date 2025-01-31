@@ -1,19 +1,23 @@
 # langchain-writer
 
-This package contains the LangChain integrations for Writer through their `writer-sdk`.
+This package contains the official LangChain integrations for Writer through their `writer-sdk`.
+
+> **Note:** This package is currently unreleased, in development, and subject to change.
 
 ## Installation and Setup
 
-- Install the LangChain partner package
+- Install the LangChain partner package:
+
 ```bash
 pip install -U langchain-writer
 ```
 
-- Get a Writer api key and set it as an environment variable (`WRITER_API_KEY`)
+- Sign up for [Writer AI Studio](https://app.writer.com/aistudio/signup?utm_campaign=devrel) and follow this [Quickstart](https://dev.writer.com/api-guides/quickstart) to obtain an API key.
+- Set your Writer API key as an environment variable (`WRITER_API_KEY`).
 
 ## Chat capabilities
 
-`Chat Writer` class provide support of streaming/nonstreaming chat completions, tool calls, batching and asynchronous usage:
+The `ChatWriter` class provides support of streaming and non-streaming chat completions, tool calls, batching, and asynchronous usage.
 
 ### Streaming (sync/async):
 ```python
@@ -21,30 +25,30 @@ from langchain_writer import ChatWriter
 
 llm = ChatWriter()
 
-#Sync chat call
+# Sync chat call
 generator = llm.stream("Sing a ballad of LangChain.")
 
 for chunk in generator:
     print(chunk)
 
-#Async chat call
+# Async chat call
 generator = await llm.astream("Sing a ballad of LangChain.")
 
 async for chunk in generator:
     print(chunk)
 ```
 
-### Non streaming (sync/async):
+### Non-streaming (sync/async):
 
 ```python
 from langchain_writer import ChatWriter
 
 llm = ChatWriter()
 
-#Sync chat call
+# Sync chat call
 llm.invoke("Sing a ballad of LangChain.")
 
-#Async chat call
+# Async chat call
 await llm.ainvoke("Sing a ballad of LangChain.")
 ```
 
@@ -65,7 +69,7 @@ llm.batch(
     )
 ```
 
-### Tools binding
+### Tool binding
 
 ```python
 from langchain_writer import ChatWriter
@@ -97,3 +101,9 @@ llm = ChatWriter()
 
 llm.bind_tools([get_supercopa_trophies_count, GetWeather])
 ```
+
+## Additional resources
+To learn more about LangChain, see the [official LangChain documentation](https://python.langchain.com/docs/introduction/). To learn more about Writer, see the [Writer developer documentation](https://dev.writer.com/home/introduction).
+
+## About Writer
+Writer is the full-stack generative AI platform for enterprises. Quickly and easily build and deploy generative AI apps with a suite of developer tools fully integrated with our platform of LLMs, graph-based RAG tools, AI guardrails, and more. Learn more at [writer.com](https://www.writer.com?utm_source=github&utm_medium=readme&utm_campaign=devrel). 
