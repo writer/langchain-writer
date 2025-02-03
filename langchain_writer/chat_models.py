@@ -9,6 +9,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Type,
@@ -394,22 +395,6 @@ class ChatWriter(BaseWriter, BaseChatModel):
 
         See ``ChatWriter.bind_tools()`` method for more.dict
 
-    Token usage:
-        .. code-block:: python
-
-            ai_msg = llm.invoke(messages)
-            ai_msg.usage_metadata
-
-        .. code-block:: python
-
-    Logprobs:
-        .. code-block:: python
-
-            ai_msg = logprobs_llm.invoke(messages, logprobs=True)
-            ai_msg.response_metadata["logprobs"]
-
-        .. code-block:: python
-
     Response metadata
         .. code-block:: python
 
@@ -601,7 +586,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
         tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable]],
         *,
         tool_choice: Optional[Union[str, Literal["auto", "none"]]] = None,
-    ) -> None:
+    ) -> Self:
         """Bind tools to the chat model.
 
         Args:
@@ -618,6 +603,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
                 if tool_choice in ("auto", "none")
                 else {"type": "function", "function": {"name": tool_choice}}
             )
+        return self
 
     def _combine_llm_outputs(self, llm_outputs: List[Optional[dict]]) -> dict:
         overall_token_usage: dict = {}
