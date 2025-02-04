@@ -71,7 +71,7 @@ def convert_message_to_dict(message: BaseMessage) -> dict:
                 {
                     "id": tool["id"],
                     "type": "function",
-                    "function": {"name": tool["name"], "arguments": tool["args"]},
+                    "function": {"name": tool["name"], "arguments": str(tool["args"])},
                 }
                 for tool in message.tool_calls
             ]

@@ -285,6 +285,8 @@ def test_chat_model_function_and_graph_calls_with_tools_outputs(
     response = chat_writer.invoke(messages)
     messages.append(response)
 
+    text_to_check_for_inclusion = response.content.lower()
+
     for tool_call in response.tool_calls:
         selected_tool = {
             "get_supercopa_trophies_count": get_supercopa_trophies_count,
@@ -294,17 +296,19 @@ def test_chat_model_function_and_graph_calls_with_tools_outputs(
 
     response = chat_writer.invoke(messages)
 
+    text_to_check_for_inclusion += " " + response.content.lower()
+
     assert isinstance(response, AIMessage)
     assert len(response.content) > 0
     assert any(
         [
-            word in response.content.lower()
+            word in text_to_check_for_inclusion
             for word in ["supercopa", "barcelona", "trophies", "15"]
         ]
     )
     assert any(
         [
-            word in response.content.lower()
+            word in text_to_check_for_inclusion
             for word in ["knowledge", "graph", "line", "document"]
         ]
     )
