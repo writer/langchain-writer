@@ -598,9 +598,11 @@ class ChatWriter(BaseWriter, BaseChatModel):
         """
         self.tools = [format_tool(tool) for tool in tools]
         if tool_choice:
+            if tool_choice == "any":
+                tool_choice = "required"
             self.tool_choice = (
                 tool_choice
-                if tool_choice in ("auto", "none")
+                if tool_choice in ("auto", "none", "required")
                 else {"type": "function", "function": {"name": tool_choice}}
             )
         return self
