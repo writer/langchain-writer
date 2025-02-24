@@ -4,22 +4,20 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "langchain-writer"
-version = "0.1.0"
+version = "0.0.1"
 description = "An integration package connecting Writer and LangChain"
-authors = []
+authors = ["Writer, Inc. <dev-feedback@writer.com>"]
 readme = "README.md"
-repository = "https://github.com/langchain-ai/langchain"
 license = "MIT"
+homepage = "https://www.writer.com"
+repository = "https://github.com/writer/langchain-writer"
+documentation = "https://dev.writer.com"
 
 [tool.mypy]
 disallow_untyped_defs = "True"
 
-[tool.poetry.urls]
-"Source Code" = "https://github.com/langchain-ai/langchain/tree/master/libs/partners/writer"
-"Release Notes" = "https://github.com/langchain-ai/langchain/releases?q=tag%3A%22writer%3D%3D0%22&expanded=true"
-
 [tool.poetry.dependencies]
-python = ">=3.11,<4.0"
+python = ">=3.8,<4.0"
 langchain-core = "^0.3.15"
 writer-sdk = "^1.6.1"
 langchain-text-splitters = "^0.3.5"
