@@ -2,8 +2,6 @@
 
 This package contains the official LangChain integrations for Writer through their `writer-sdk`.
 
-> **Note:** This package is currently unreleased, in development, and subject to change.
-
 ## Installation and Setup
 
 - Install the LangChain partner package:
@@ -106,4 +104,4 @@ llm.bind_tools([get_supercopa_trophies_count, GetWeather])
 To learn more about LangChain, see the [official LangChain documentation](https://python.langchain.com/docs/introduction/). To learn more about Writer, see the [Writer developer documentation](https://dev.writer.com/home/introduction).
 
 ## About Writer
-Writer is the full-stack generative AI platform for enterprises. Quickly and easily build and deploy generative AI apps with a suite of developer tools fully integrated with our platform of LLMs, graph-based RAG tools, AI guardrails, and more. Learn more at [writer.com](https://www.writer.com?utm_source=github&utm_medium=readme&utm_campaign=devrel). 
+Writer is the full-stack generative AI platform for enterprises. Quickly and easily build and deploy generative AI apps with a suite of developer tools fully integrated with our platform of LLMs, graph-based RAG tools, AI guardrails, and more. Learn more at [writer.com](https://www.writer.com?utm_source=github&utm_medium=readme&utm_campaign=devrel).
