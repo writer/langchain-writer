@@ -4,7 +4,7 @@ from langchain_core.documents.base import Blob
 from langchain_writer import ChatWriter, GraphTool, WriterTextSplitter
 from langchain_writer.pdf_parser import PDFParser
 
-GRAPH_IDS = ["id_1", "id_2"]
+GRAPH_IDS = ["087072a0-1ccb-4c5a-8e44-1f92a5aec4ab"]
 
 
 @pytest.fixture(scope="function")
