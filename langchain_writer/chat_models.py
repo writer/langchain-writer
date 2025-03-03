@@ -9,7 +9,6 @@ from typing import (
     List,
     Literal,
     Optional,
-    Self,
     Sequence,
     Tuple,
     Type,
@@ -20,7 +19,7 @@ from langchain_core.callbacks import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
 )
-from langchain_core.language_models import BaseChatModel
+from langchain_core.language_models import BaseChatModel, LanguageModelInput
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
@@ -41,6 +40,7 @@ from langchain_core.output_parsers.openai_tools import (
     parse_tool_call,
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
+from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, ConfigDict, Field
@@ -400,13 +400,11 @@ class ChatWriter(BaseWriter, BaseChatModel):
 
         graph_tool = GraphTool(graph_ids=['id1', 'id2'])
 
-        !!Pay attention, that Writer tools binding modifies initial object
-        instead of creating a new one with binded tools!!
-        Moreover, besides 'function' WriterChat supports 'graph' tool type.
-        To use it pass GraphTool object from langchain_writer package
+        Besides 'function' WriterChat supports 'graph' and 'llm' tool types.
+        To use them pass GraphTool/LLMTool object from langchain_writer package
         as one of tools list elements of bind_tools() function params.
 
-        llm.bind_tools([graph_tool, GetWeather])
+        llm_with_tools = llm.bind_tools([graph_tool, GetWeather])
 
         .. code-block:: python
 
@@ -443,12 +441,6 @@ class ChatWriter(BaseWriter, BaseChatModel):
     """Return logprobs or not"""
     logprobs: bool = Field(default=True)
 
-    """Tools to use by chat"""
-    tools: list[dict[str, Any]] = Field(default_factory=list)
-
-    """Tools selection mode"""
-    tool_choice: Union[Literal["none", "auto"], dict[str, Any]] = Field(default="auto")
-
     model_config = ConfigDict(
         populate_by_name=True,
     )
@@ -483,8 +475,6 @@ class ChatWriter(BaseWriter, BaseChatModel):
             "logprobs": self.logprobs,
             **self.model_kwargs,
         }
-        if self.tools:
-            params.update({"tools": self.tools, "tool_choice": self.tool_choice})
         return params
 
     def _convert_messages_to_dicts(
@@ -603,7 +593,8 @@ class ChatWriter(BaseWriter, BaseChatModel):
         tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable]],
         *,
         tool_choice: Optional[Union[str, Literal["auto", "none"]]] = None,
-    ) -> Self:
+        **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, BaseMessage]:
         """Bind tools to the chat model.
 
         Args:
@@ -611,18 +602,20 @@ class ChatWriter(BaseWriter, BaseChatModel):
             tool_choice: Which tool to require ('auto', 'none', or specific tool name)
 
         Returns:
-            Self
+            Runnable Binding
         """
-        self.tools = [format_tool(tool) for tool in tools]
+        formatted_tools = [format_tool(tool) for tool in tools]
         if tool_choice:
             if tool_choice == "any":
                 tool_choice = "required"
-            self.tool_choice = (
+            tool_choice = (
                 tool_choice
                 if tool_choice in ("auto", "none", "required")
                 else {"type": "function", "function": {"name": tool_choice}}
             )
-        return self
+            kwargs["tool_choice"] = tool_choice
+
+        return super().bind(tools=formatted_tools, **kwargs)
 
     def _combine_llm_outputs(self, llm_outputs: List[Optional[dict]]) -> dict:
         overall_token_usage: dict = {}

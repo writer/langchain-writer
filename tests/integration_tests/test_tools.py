@@ -84,10 +84,12 @@ get_product_info = {
 
 
 def test_chat_model_tool_binding(chat_writer: ChatWriter):
-    chat_writer.bind_tools([get_supercopa_trophies_count, get_laliga_points])
+    chat_writer = chat_writer.bind_tools(
+        [get_supercopa_trophies_count, get_laliga_points]
+    )
 
-    assert len(chat_writer.tools) == 2
-    for chat_tool in chat_writer.tools:
+    assert len(chat_writer.kwargs["tools"]) == 2
+    for chat_tool in chat_writer.kwargs["tools"]:
         assert chat_tool["function"]["name"] in [
             "get_supercopa_trophies_count",
             "get_laliga_points",
@@ -95,7 +97,7 @@ def test_chat_model_tool_binding(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls(chat_writer: ChatWriter):
-    chat_writer.bind_tools(
+    chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
 
@@ -112,7 +114,7 @@ def test_chat_model_tool_calls(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_graph_call(chat_writer: ChatWriter, graph_tool: GraphTool):
-    chat_writer.bind_tools([graph_tool])
+    chat_writer = chat_writer.bind_tools([graph_tool])
 
     response = chat_writer.invoke(
         "Use knowledge graph tool to compose this answer. Tell me what the first line of documents stored in your KG"
@@ -123,7 +125,7 @@ def test_chat_model_tool_graph_call(chat_writer: ChatWriter, graph_tool: GraphTo
 
 
 def test_chat_model_tool_llm_call(chat_writer: ChatWriter, llm_tool: LLMTool):
-    chat_writer.bind_tools([llm_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool])
 
     response = chat_writer.invoke("Use LLM tool and tell me about Newton binom.")
 
@@ -137,7 +139,7 @@ def test_chat_model_tool_llm_call(chat_writer: ChatWriter, llm_tool: LLMTool):
 
 
 def test_chat_model_tool_dict_definition_call(chat_writer: ChatWriter):
-    chat_writer.bind_tools([get_product_info])
+    chat_writer = chat_writer.bind_tools([get_product_info])
 
     response = chat_writer.invoke(
         "How many sugar does cookie with id: 1243 have per 100 gram?"
@@ -151,7 +153,7 @@ def test_chat_model_tool_dict_definition_call(chat_writer: ChatWriter):
 def test_chat_model_tool_graph_and_function_call(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
 
     response = chat_writer.invoke(
         "Use knowledge graph tool to compose this answer. "
@@ -168,7 +170,7 @@ def test_chat_model_tool_graph_and_function_call(
 def test_chat_model_tool_llm_and_function_call(
     chat_writer: ChatWriter, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
 
     response = chat_writer.invoke(
         "Use LLM tool to compose this answer. "
@@ -183,7 +185,9 @@ def test_chat_model_tool_llm_and_function_call(
 
 
 def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
-    chat_writer.bind_tools([GetWeather, GetPopulation], tool_choice="auto")
+    chat_writer = chat_writer.bind_tools(
+        [GetWeather, GetPopulation], tool_choice="auto"
+    )
 
     response = chat_writer.invoke(
         "Which city is hotter today and which is bigger: LA or NY?"
@@ -195,7 +199,7 @@ def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
-    chat_writer.bind_tools(
+    chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
         tool_choice="get_laliga_points",
     )
@@ -210,7 +214,7 @@ def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
-    chat_writer.bind_tools(
+    chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
     messages = [
@@ -236,7 +240,7 @@ def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
 def test_chat_model_function_and_graph_calls_with_tools_outputs(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools(
+    chat_writer = chat_writer.bind_tools(
         [
             get_supercopa_trophies_count,
             get_laliga_points,
@@ -290,7 +294,7 @@ def test_chat_model_function_and_graph_calls_with_tools_outputs(
 async def test_chat_model_tool_graph_acall(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool])
+    chat_writer = chat_writer.bind_tools([graph_tool])
 
     response = await chat_writer.ainvoke(
         "Use knowledge graph tool to compose this answer. "
@@ -303,7 +307,7 @@ async def test_chat_model_tool_graph_acall(
 
 @pytest.mark.asyncio
 async def test_chat_model_tool_llm_acall(chat_writer: ChatWriter, llm_tool: LLMTool):
-    chat_writer.bind_tools([llm_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool])
 
     response = await chat_writer.ainvoke("Use LLM tool and tell me about Newton binom.")
 
@@ -320,7 +324,7 @@ async def test_chat_model_tool_llm_acall(chat_writer: ChatWriter, llm_tool: LLMT
 async def test_chat_model_tool_graph_and_function_acall(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
 
     response = await chat_writer.ainvoke(
         "Use knowledge graph tool to compose this answer. "
@@ -338,7 +342,7 @@ async def test_chat_model_tool_graph_and_function_acall(
 async def test_chat_model_tool_llm_and_function_acall(
     chat_writer: ChatWriter, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
 
     response = await chat_writer.ainvoke(
         "Use LLM tool to compose this answer. "
@@ -353,7 +357,7 @@ async def test_chat_model_tool_llm_and_function_acall(
 
 
 def test_chat_model_tool_calls_streaming(chat_writer: ChatWriter):
-    chat_writer.bind_tools(
+    chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
         tool_choice="get_laliga_points",
     )
@@ -371,7 +375,7 @@ def test_chat_model_tool_calls_streaming(chat_writer: ChatWriter):
 
 
 def test_chat_model_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter):
-    chat_writer.bind_tools(
+    chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points], tool_choice="auto"
     )
     messages = [
@@ -398,7 +402,7 @@ def test_chat_model_tool_calls_with_tools_outputs_stream(chat_writer: ChatWriter
 def test_chat_model_tool_graph_call_streaming(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool])
+    chat_writer = chat_writer.bind_tools([graph_tool])
 
     response = chat_writer.stream(
         "Use knowledge graph tool to compose this answer. "
@@ -417,7 +421,7 @@ def test_chat_model_tool_graph_call_streaming(
 def test_chat_model_tool_function_graph_call_streaming(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
 
     response = chat_writer.stream(
         "Use knowledge graph tool to compose this answer. "
@@ -440,7 +444,7 @@ def test_chat_model_tool_function_graph_call_streaming(
 async def test_chat_model_tool_graph_call_streaming_async(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool])
+    chat_writer = chat_writer.bind_tools([graph_tool])
 
     response = chat_writer.astream(
         "Use knowledge graph tool to compose this answer. Tell me what the first line of documents stored in your KG"
@@ -459,7 +463,7 @@ async def test_chat_model_tool_graph_call_streaming_async(
 async def test_chat_model_tool_function_graph_call_astreaming(
     chat_writer: ChatWriter, graph_tool: GraphTool
 ):
-    chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
 
     response = chat_writer.astream(
         "Use knowledge graph tool to compose this answer. "
@@ -480,7 +484,7 @@ async def test_chat_model_tool_function_graph_call_astreaming(
 
 
 def test_chat_model_tool_llm_call_streaming(chat_writer: ChatWriter, llm_tool: LLMTool):
-    chat_writer.bind_tools([llm_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool])
 
     response = chat_writer.stream("Use LLM tool and tell me about Newton binom.")
 
@@ -496,7 +500,7 @@ def test_chat_model_tool_llm_call_streaming(chat_writer: ChatWriter, llm_tool: L
 def test_chat_model_tool_function_llm_call_streaming(
     chat_writer: ChatWriter, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
 
     response = chat_writer.stream(
         "Use LLM tool to compose this answer. "
@@ -519,7 +523,7 @@ def test_chat_model_tool_function_llm_call_streaming(
 async def test_chat_model_tool_llm_call_streaming_async(
     chat_writer: ChatWriter, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool])
 
     response = chat_writer.astream("Use LLM tool and tell me about Newton binom.")
 
@@ -536,7 +540,7 @@ async def test_chat_model_tool_llm_call_streaming_async(
 async def test_chat_model_tool_function_llm_call_astreaming(
     chat_writer: ChatWriter, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+    chat_writer = chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
 
     response = chat_writer.astream(
         "Use LLM tool to compose this answer. "
@@ -559,7 +563,7 @@ async def test_chat_model_tool_function_llm_call_astreaming(
 def test_graph_llm_tool_call_error(
     chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, graph_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool, graph_tool])
 
     with pytest.raises(BadRequestError):
         chat_writer.invoke("Hello")
@@ -569,7 +573,7 @@ def test_graph_llm_tool_call_error(
 async def test_graph_llm_tool_acall_error(
     chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, graph_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool, graph_tool])
 
     with pytest.raises(BadRequestError):
         await chat_writer.ainvoke("Hello")
@@ -578,7 +582,7 @@ async def test_graph_llm_tool_acall_error(
 def test_graph_llm_tool_streaming_error(
     chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, graph_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool, graph_tool])
 
     with pytest.raises(BadRequestError):
         for _ in chat_writer.stream("Hello"):
@@ -589,7 +593,7 @@ def test_graph_llm_tool_streaming_error(
 async def test_graph_llm_tool_astreaming_error(
     chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
 ):
-    chat_writer.bind_tools([llm_tool, graph_tool])
+    chat_writer = chat_writer.bind_tools([llm_tool, graph_tool])
 
     with pytest.raises(BadRequestError):
         async for _ in chat_writer.astream("Hello"):
