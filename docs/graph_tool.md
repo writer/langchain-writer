@@ -55,10 +55,10 @@ llm = ChatWriter(
 graph_tool = GraphTool(graph_ids=["id1", "id2"])
 
 # Bind the tool to the ChatWriter
-llm.bind_tools([graph_tool])
+llm_with_tools = llm.bind_tools([graph_tool])
 
 # Now the model can access the knowledge graph in its responses
-response = llm.invoke([
+response = llm_with_tools.invoke([
     ("system", "You are a helpful assistant with access to a knowledge graph."),
     ("human", "Can you tell me about our company's Q2 financial results?")
 ])
@@ -68,11 +68,8 @@ response = llm.invoke([
 
 1. The `GraphTool` does not support direct invocation through the `_run` method. Attempting to call this method will raise a `NotImplementedError`.
 
-2. When binding a `GraphTool` to a `ChatWriter`, the original `ChatWriter` object is modified in place, rather than creating a new instance with the tools bound.
-
-3. The `graph_ids` parameter is crucial as it specifies which knowledge graphs the model can access. These IDs should correspond to knowledge graphs that have been created in your Writer account.
-
-4. The `subqueries` parameter controls whether the response includes the intermediate queries that Palmyra (Writer's model) used to retrieve information from the knowledge graph.
+2. The `graph_ids` parameter is crucial as it specifies which knowledge graphs the model can access. These IDs should correspond to knowledge graphs that have been created in your Writer account.
+3. The `subqueries` parameter controls whether the response includes the intermediate queries that Palmyra (Writer's model) used to retrieve information from the knowledge graph.
 
 ## Use cases
 

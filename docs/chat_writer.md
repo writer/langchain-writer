@@ -81,16 +81,16 @@ class GetWeather(BaseModel):
 graph_tool = GraphTool(graph_ids=['id1', 'id2'])
 
 # Bind tools to the model
-llm.bind_tools([graph_tool, GetWeather])
+llm_with_tools = llm.bind_tools([graph_tool, GetWeather])
 
 # Now the model can use these tools in its responses
-response = llm.invoke([
+response = llm_with_tools.invoke([
     ("system", "You are a helpful assistant."),
     ("human", "What's the weather like in New York?")
 ])
 ```
 
-> **Note**: Writer tools binding modifies the initial object instead of creating a new one with bound tools. Besides 'function' type, WriterChat supports 'graph' tool type via the `GraphTool` class.
+> **Note**: Besides 'function' type, WriterChat supports 'graph', 'llm' and 'app' tool type via the `GraphTool`, `LLMTool` and `NoCodeApp` class.
 
 ## Response metadata
 
@@ -112,8 +112,6 @@ metadata = ai_msg.response_metadata
 | `max_tokens` | `Optional[int]` | `None` | Maximum number of tokens to generate |
 | `stop` | `Optional[Union[str, List[str]]]` | `None` | Sequences where the model should stop generating |
 | `logprobs` | `bool` | `True` | Whether to return log probabilities |
-| `tools` | `list[dict[str, Any]]` | `[]` | List of tools available to the model |
-| `tool_choice` | `Union[Literal["none", "auto"], dict[str, Any]]` | `"auto"` | Which tool to use |
 
 ## Advanced features
 
@@ -129,7 +127,7 @@ The `ChatWriter` class provides utilities for converting between LangChain messa
 The `bind_tools` method allows you to provide tools to the model that it can use to perform actions:
 
 ```python
-llm.bind_tools(
+llm_with_tools = llm.bind_tools(
     tools=[tool1, tool2],
     tool_choice="auto"  # or "none", or a specific tool name
 )

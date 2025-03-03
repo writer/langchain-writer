@@ -12,6 +12,10 @@ The `ChatWriter` class provides integration with Writer's chat model API, allowi
 
 The `GraphTool` class enables access to Writer's Knowledge Graph functionality, allowing language models to retrieve information from structured knowledge graphs to enhance their responses.
 
+### [LLMTool](./llm_tool.md)
+
+The `LLMTool` class enables access to Writer's LLM tool type functionality, allowing sub invocation of other Palmyra models to enhance their responses.
+
 ### [PDFParser](./pdf_parser.md)
 
 The `PDFParser` class provides integration with Writer's PDF parsing capabilities, allowing you to extract and process text content from PDF documents using Writer's advanced parsing technology.
@@ -59,8 +63,8 @@ documents = parser.parse(blob)
 chunks = splitter.split_text("Long text to split...")
 
 # Use the graph tool with the chat model
-llm.bind_tools([graph_tool])
-response = llm.invoke([
+llm_with_tool = llm.bind_tools([graph_tool])
+response = llm_with_tool.invoke([
     ("system", "You are a helpful assistant with access to a knowledge graph."),
     ("human", "What information can you find about our company?")
 ])
