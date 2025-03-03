@@ -4,8 +4,10 @@ import pytest
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
+from writerai import BadRequestError
 
 from langchain_writer import ChatWriter, GraphTool
+from langchain_writer.tools import LLMTool
 
 
 @tool
@@ -113,11 +115,25 @@ def test_chat_model_tool_graph_call(chat_writer: ChatWriter, graph_tool: GraphTo
     chat_writer.bind_tools([graph_tool])
 
     response = chat_writer.invoke(
-        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+        "Use knowledge graph tool to compose this answer. Tell me what the first line of documents stored in your KG"
     )
 
     assert response.additional_kwargs.get("graph_data")
     assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+
+
+def test_chat_model_tool_llm_call(chat_writer: ChatWriter, llm_tool: LLMTool):
+    chat_writer.bind_tools([llm_tool])
+
+    response = chat_writer.invoke("Use LLM tool and tell me about Newton binom.")
+
+    assert response.additional_kwargs.get("llm_data")
+    assert any(
+        [
+            word in response.additional_kwargs["llm_data"]["prompt"]
+            for word in ["Newton", "binom"]
+        ]
+    )
 
 
 def test_chat_model_tool_dict_definition_call(chat_writer: ChatWriter):
@@ -139,12 +155,29 @@ def test_chat_model_tool_graph_and_function_call(
 
     response = chat_writer.invoke(
         "Use knowledge graph tool to compose this answer. "
-        "Tell me what th first line of documents stored in your KG. "
+        "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
     )
 
     assert response.additional_kwargs.get("graph_data")
     assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
+
+
+def test_chat_model_tool_llm_and_function_call(
+    chat_writer: ChatWriter, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+
+    response = chat_writer.invoke(
+        "Use LLM tool to compose this answer. "
+        "Tell me how Newton binom works."
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    assert response.additional_kwargs.get("llm_data")
+    assert len(response.additional_kwargs["llm_data"]["prompt"]) > 0
     assert response.tool_calls
     assert len(response.tool_calls) == 1
 
@@ -217,7 +250,7 @@ def test_chat_model_function_and_graph_calls_with_tools_outputs(
     messages = [
         HumanMessage(
             "Use knowledge graph tool to compose this answer. "
-            "Tell me what th first line of documents stored in your KG. "
+            "Tell me what the first line of documents stored in your KG. "
             "Also I want to know: how many SuperCopa trophies have Barcelona won?"
         )
     ]
@@ -261,11 +294,26 @@ async def test_chat_model_tool_graph_acall(
 
     response = await chat_writer.ainvoke(
         "Use knowledge graph tool to compose this answer. "
-        "Tell me what th first line of documents stored in your KG"
+        "Tell me what the first line of documents stored in your KG"
     )
 
     assert response.additional_kwargs.get("graph_data")
     assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_llm_acall(chat_writer: ChatWriter, llm_tool: LLMTool):
+    chat_writer.bind_tools([llm_tool])
+
+    response = await chat_writer.ainvoke("Use LLM tool and tell me about Newton binom.")
+
+    assert response.additional_kwargs.get("llm_data")
+    assert any(
+        [
+            word in response.additional_kwargs["llm_data"]["prompt"]
+            for word in ["Newton", "binom"]
+        ]
+    )
 
 
 @pytest.mark.asyncio
@@ -276,12 +324,30 @@ async def test_chat_model_tool_graph_and_function_acall(
 
     response = await chat_writer.ainvoke(
         "Use knowledge graph tool to compose this answer. "
-        "Tell me what th first line of documents stored in your KG. "
+        "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
     )
 
     assert response.additional_kwargs.get("graph_data")
     assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_llm_and_function_acall(
+    chat_writer: ChatWriter, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+
+    response = await chat_writer.ainvoke(
+        "Use LLM tool to compose this answer. "
+        "Tell me how Newton binom works."
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    assert response.additional_kwargs.get("llm_data")
+    assert len(response.additional_kwargs["llm_data"]["prompt"]) > 0
     assert response.tool_calls
     assert len(response.tool_calls) == 1
 
@@ -336,7 +402,7 @@ def test_chat_model_tool_graph_call_streaming(
 
     response = chat_writer.stream(
         "Use knowledge graph tool to compose this answer. "
-        "Tell me what th first line of documents stored in your KG"
+        "Tell me what the first line of documents stored in your KG"
     )
 
     full = next(response)
@@ -355,7 +421,7 @@ def test_chat_model_tool_function_graph_call_streaming(
 
     response = chat_writer.stream(
         "Use knowledge graph tool to compose this answer. "
-        "Tell me what th first line of documents stored in your KG. "
+        "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
     )
 
@@ -377,7 +443,7 @@ async def test_chat_model_tool_graph_call_streaming_async(
     chat_writer.bind_tools([graph_tool])
 
     response = chat_writer.astream(
-        "Use knowledge graph tool to compose this answer. Tell me what th first line of documents stored in your KG"
+        "Use knowledge graph tool to compose this answer. Tell me what the first line of documents stored in your KG"
     )
 
     full = await anext(response)
@@ -397,7 +463,7 @@ async def test_chat_model_tool_function_graph_call_astreaming(
 
     response = chat_writer.astream(
         "Use knowledge graph tool to compose this answer. "
-        "Tell me what th first line of documents stored in your KG. "
+        "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
     )
 
@@ -411,3 +477,120 @@ async def test_chat_model_tool_function_graph_call_astreaming(
     assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
     assert full.tool_calls
     assert len(full.tool_calls) == 1
+
+
+def test_chat_model_tool_llm_call_streaming(chat_writer: ChatWriter, llm_tool: LLMTool):
+    chat_writer.bind_tools([llm_tool])
+
+    response = chat_writer.stream("Use LLM tool and tell me about Newton binom.")
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("llm_data")
+    assert len(full.additional_kwargs["llm_data"]["prompt"]) > 0
+
+
+def test_chat_model_tool_function_llm_call_streaming(
+    chat_writer: ChatWriter, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+
+    response = chat_writer.stream(
+        "Use LLM tool to compose this answer. "
+        "Tell me how Newton binom works."
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("llm_data")
+    assert len(full.additional_kwargs["llm_data"]["prompt"]) > 0
+    assert full.tool_calls
+    assert len(full.tool_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_llm_call_streaming_async(
+    chat_writer: ChatWriter, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool])
+
+    response = chat_writer.astream("Use LLM tool and tell me about Newton binom.")
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("llm_data")
+    assert len(full.additional_kwargs["llm_data"]["prompt"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_chat_model_tool_function_llm_call_astreaming(
+    chat_writer: ChatWriter, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, get_supercopa_trophies_count])
+
+    response = chat_writer.astream(
+        "Use LLM tool to compose this answer. "
+        "Tell me how Newton binom works."
+        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.additional_kwargs.get("llm_data")
+    assert full.additional_kwargs.get("llm_data")["prompt"]
+    assert len(full.additional_kwargs["llm_data"]["prompt"]) > 0
+    assert full.tool_calls
+    assert len(full.tool_calls) == 1
+
+
+def test_graph_llm_tool_call_error(
+    chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, graph_tool])
+
+    with pytest.raises(BadRequestError):
+        chat_writer.invoke("Hello")
+
+
+@pytest.mark.asyncio
+async def test_graph_llm_tool_acall_error(
+    chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, graph_tool])
+
+    with pytest.raises(BadRequestError):
+        await chat_writer.ainvoke("Hello")
+
+
+def test_graph_llm_tool_streaming_error(
+    chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, graph_tool])
+
+    with pytest.raises(BadRequestError):
+        for _ in chat_writer.stream("Hello"):
+            ...
+
+
+@pytest.mark.asyncio
+async def test_graph_llm_tool_astreaming_error(
+    chat_writer: ChatWriter, graph_tool: GraphTool, llm_tool: LLMTool
+):
+    chat_writer.bind_tools([llm_tool, graph_tool])
+
+    with pytest.raises(BadRequestError):
+        async for _ in chat_writer.astream("Hello"):
+            ...

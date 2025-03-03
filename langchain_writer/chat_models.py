@@ -79,6 +79,9 @@ def convert_message_to_dict(message: BaseMessage) -> dict:
         if graph_data := message.additional_kwargs.get("graph_data"):
             message_dict["graph_data"] = graph_data
 
+        if llm_calls := message.additional_kwargs.get("llm_data"):
+            message_dict["llm_data"] = llm_calls
+
     elif isinstance(message, SystemMessage):
         message_dict["role"] = "system"
     elif isinstance(message, ToolMessage):
@@ -128,6 +131,9 @@ def convert_dict_to_message(response_message: dict) -> BaseMessage:
 
         if raw_graph_calls := response_message.get("graph_data", {}):
             additional_kwargs["graph_data"] = raw_graph_calls
+
+        if raw_llm_calls := response_message.get("llm_data", {}):
+            additional_kwargs["llm_data"] = raw_llm_calls
 
         return AIMessage(
             content=content,
@@ -200,6 +206,9 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
 
         if raw_graph_calls := delta.get("graph_data", {}):
             additional_kwargs["graph_data"] = raw_graph_calls
+
+        if raw_llm_calls := delta.get("llm_data", {}):
+            additional_kwargs["llm_data"] = raw_llm_calls
 
         return AIMessageChunk(
             content=content,
@@ -275,7 +284,7 @@ def format_message_content(content: Any) -> str:
 def format_tool(
     tool: Union[Dict[str, Any], Type[BaseModel], Callable]
 ) -> dict[str, Any]:
-    """Format tool and taking into consideration it's type e.g. 'function' or 'graph'.
+    """Format tool and taking into consideration it's type e.g. 'function, 'graph', 'llm'.
 
     Args:
         tool: Tool to format.
@@ -299,6 +308,14 @@ def format_tool(
                 "description": dict_tool.get("description", ""),
                 "graph_ids": dict_tool.get("graph_ids", []),
                 "subqueries": dict_tool.get("subqueries", False),
+            },
+        }
+    elif dict_tool.get("type") == "llm":
+        return {
+            "type": "llm",
+            "function": {
+                "description": dict_tool.get("description", ""),
+                "model": dict_tool.get("model_name", ""),
             },
         }
     else:
@@ -594,7 +611,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
             tool_choice: Which tool to require ('auto', 'none', or specific tool name)
 
         Returns:
-            None
+            Self
         """
         self.tools = [format_tool(tool) for tool in tools]
         if tool_choice:

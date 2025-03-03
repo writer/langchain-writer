@@ -3,8 +3,9 @@ from langchain_core.documents.base import Blob
 
 from langchain_writer import ChatWriter, GraphTool, WriterTextSplitter
 from langchain_writer.pdf_parser import PDFParser
+from langchain_writer.tools import LLMTool
 
-GRAPH_IDS = ["087072a0-1ccb-4c5a-8e44-1f92a5aec4ab"]
+GRAPH_IDS = ["id_1", "id_2"]
 
 
 @pytest.fixture(scope="function")
@@ -15,6 +16,11 @@ def chat_writer():
 @pytest.fixture(scope="function")
 def graph_tool():
     return GraphTool(graph_ids=GRAPH_IDS)
+
+
+@pytest.fixture(scope="function")
+def llm_tool():
+    return LLMTool()
 
 
 @pytest.fixture(scope="function")
