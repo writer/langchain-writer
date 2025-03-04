@@ -46,6 +46,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, ConfigDict, Field
 
 from langchain_writer.base import BaseWriter
+from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool
 
 
 def convert_message_to_dict(message: BaseMessage) -> dict:
@@ -301,7 +302,7 @@ def format_tool(
     elif isinstance(tool, dict):
         dict_tool = tool
 
-    if dict_tool.get("type") == "graph":
+    if isinstance(tool, GraphTool):
         return {
             "type": "graph",
             "function": {
@@ -310,7 +311,7 @@ def format_tool(
                 "subqueries": dict_tool.get("subqueries", False),
             },
         }
-    elif dict_tool.get("type") == "llm":
+    elif isinstance(tool, LLMTool):
         return {
             "type": "llm",
             "function": {
@@ -318,6 +319,8 @@ def format_tool(
                 "model": dict_tool.get("model_name", ""),
             },
         }
+    elif isinstance(tool, NoCodeAppTool):
+        return tool.to_openai_tool()
     else:
         return convert_to_openai_tool(tool)
 
