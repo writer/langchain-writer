@@ -116,24 +116,41 @@ class NoCodeAppTool(BaseTool):
         if not kwargs.get("async_client"):
             self.async_client = AsyncWriter(api_key=self.api_key.get_secret_value())
 
-        app_metadata = self.client.applications.retrieve(application_id=self.app_id)
+        app_metadata = self.client.applications.retrieve(self.app_id)
         self.app_inputs = app_metadata.inputs
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         return self.client.applications.generate_content(
-            application_id=self.app_id, inputs=self.convert_inputs(**kwargs)
+            application_id=self.app_id, inputs=self.convert_inputs(kwargs.get("inputs"))
         )
 
     async def _arun(self, *args: Any, **kwargs: Any) -> Any:
-        return await self.applications.generate_content(
-            application_id=self.app_id, inputs=self.convert_inputs(**kwargs)
+        return await self.async_client.applications.generate_content(
+            application_id=self.app_id, inputs=self.convert_inputs(kwargs.get("inputs"))
         )
 
-    def convert_inputs(self, **kwargs) -> list[Input]:
-        inputs = kwargs.get("inputs")
+    def convert_inputs(self, inputs: dict) -> list[Input]:
+        """Convert inputs from dict into Writer objects.
+
+        Args:
+            inputs: No-code application inputs stored in dict required to run no-code app tool:
+
+             inputs = {
+
+             "Input name": "Input value",
+
+             "Another input name": ["List", "of", "string", "values"],
+
+             }
+
+             Input values should be strings or lists of strings.
+
+        Returns:
+            List of Writer input objects.
+        """
         if not inputs or not isinstance(inputs, dict):
             raise ValueError(
-                "To run no-code app tool you must include inputs dict as keyword argument."
+                "To run no-code app tool you must pass non-empty inputs dict."
             )
 
         converted_inputs = []
