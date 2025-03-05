@@ -5,9 +5,15 @@ from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from writerai import BadRequestError
+from writerai.types import ApplicationGenerateContentResponse
 
 from langchain_writer import ChatWriter, GraphTool
-from langchain_writer.tools import LLMTool
+from langchain_writer.tools import LLMTool, NoCodeAppTool
+from tests.integration_tests.conftest import (
+    RESEARCH_APP_ID,
+    TEXT_GENERATION_APP_ID,
+    get_app_inputs,
+)
 
 
 @tool
@@ -598,3 +604,103 @@ async def test_graph_llm_tool_astreaming_error(
     with pytest.raises(BadRequestError):
         async for _ in chat_writer.astream("Hello"):
             ...
+
+
+@pytest.mark.parametrize("app_id", [TEXT_GENERATION_APP_ID, RESEARCH_APP_ID])
+def test_app_initialization(app_id):
+    app_tool = NoCodeAppTool(app_id=app_id, name="Names library application")
+
+    assert app_tool.app_id == app_id
+    assert app_tool.name == "Names library application"
+    assert len(app_tool.app_inputs) > 0
+
+
+def test_no_code_app_run(no_code_app_tool: NoCodeAppTool):
+    inputs = get_app_inputs(no_code_app_tool)
+    print()
+
+    result = no_code_app_tool.run(tool_input={"inputs": inputs})
+
+    assert isinstance(result, ApplicationGenerateContentResponse)
+    assert len(result.suggestion) > 0
+
+
+@pytest.mark.asyncio
+async def test_no_code_app_arun(no_code_app_tool: NoCodeAppTool):
+    inputs = get_app_inputs(no_code_app_tool)
+    print()
+
+    result = await no_code_app_tool.arun(tool_input={"inputs": inputs})
+
+    assert isinstance(result, ApplicationGenerateContentResponse)
+    assert len(result.suggestion) > 0
+
+
+def test_no_code_app_binded_call(
+    chat_writer: ChatWriter, no_code_app_tool: NoCodeAppTool
+):
+    chat_writer = chat_writer.bind_tools([no_code_app_tool], tool_choice="auto")
+
+    response = chat_writer.invoke(
+        "Use no code app tool and create an answer, based on no-code app invocation result. "
+        "Fill all app inputs by random strings"
+    )
+
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0]["name"] == "No-code application"
+
+
+@pytest.mark.asyncio
+async def test_no_code_app_binded_acall(
+    chat_writer: ChatWriter, no_code_app_tool: NoCodeAppTool
+):
+    chat_writer = chat_writer.bind_tools([no_code_app_tool], tool_choice="auto")
+
+    response = await chat_writer.ainvoke(
+        "Use no code app tool and create an answer, based on no-code app invocation result. "
+        "Fill all app inputs by random strings"
+    )
+
+    assert response.tool_calls
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0]["name"] == "No-code application"
+
+
+def test_no_code_app_binded_streaming(
+    chat_writer: ChatWriter, no_code_app_tool: NoCodeAppTool
+):
+    chat_writer = chat_writer.bind_tools([no_code_app_tool], tool_choice="auto")
+
+    response = chat_writer.stream(
+        "Use no code app tool and create an answer, based on no-code app invocation result. "
+        "Fill all app inputs by random strings"
+    )
+
+    for chunk in response:
+        assert isinstance(chunk, AIMessageChunk)
+        if chunk.tool_call_chunks:
+            assert (
+                chunk.tool_call_chunks[0]["args"]
+                or chunk.tool_call_chunks[0]["name"] == "No-code application"
+            )
+
+
+@pytest.mark.asyncio
+async def test_no_code_app_binded_astreaming(
+    chat_writer: ChatWriter, no_code_app_tool: NoCodeAppTool
+):
+    chat_writer = chat_writer.bind_tools([no_code_app_tool], tool_choice="auto")
+
+    response = chat_writer.astream(
+        "Use no code app tool and create an answer, based on no-code app invocation result. "
+        "Fill all app inputs by random strings"
+    )
+
+    async for chunk in response:
+        assert isinstance(chunk, AIMessageChunk)
+        if chunk.tool_call_chunks:
+            assert (
+                chunk.tool_call_chunks[0]["args"]
+                or chunk.tool_call_chunks[0]["name"] == "No-code application"
+            )
