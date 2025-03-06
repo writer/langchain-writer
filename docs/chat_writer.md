@@ -1,3 +1,5 @@
+from docs.tools import app_id
+
 # ChatWriter
 
 `ChatWriter` is a LangChain integration for Writer's chat model API. It provides a seamless way to interact with Writer's powerful language models for chat-based applications.
@@ -69,7 +71,7 @@ responses = await llm.abatch([messages1, messages2, messages3])
 The `ChatWriter` supports function calling through tools:
 
 ```python
-from langchain_writer.tools import GraphTool
+from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool
 from pydantic import BaseModel, Field
 
 # Define a tool using Pydantic
@@ -80,8 +82,14 @@ class GetWeather(BaseModel):
 # Create a GraphTool for knowledge graph access
 graph_tool = GraphTool(graph_ids=['id1', 'id2'])
 
+# Create a LLMTool for another LLM models access
+llm_tool = LLMTool(model_name="palmyra-creative")
+
+# Create a NoCodeAppTool for no-code Writer apps access
+no_code_app_tool = NoCodeAppTool(app_id="id")
+
 # Bind tools to the model
-llm_with_tools = llm.bind_tools([graph_tool, GetWeather])
+llm_with_tools = llm.bind_tools([graph_tool, llm_tool, no_code_app_tool, GetWeather])
 
 # Now the model can use these tools in its responses
 response = llm_with_tools.invoke([
@@ -90,7 +98,7 @@ response = llm_with_tools.invoke([
 ])
 ```
 
-> **Note**: Besides 'function' type, WriterChat supports 'graph', 'llm' and 'app' tool type via the `GraphTool`, `LLMTool` and `NoCodeApp` class.
+> **Note**: Besides 'function' type, WriterChat supports 'graph', 'llm' and 'app' tool type via the `GraphTool`, `LLMTool` and `NoCodeApp` classes.
 
 ## Response metadata
 

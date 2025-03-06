@@ -343,10 +343,10 @@ class ChatWriter(BaseWriter, BaseChatModel):
             from langchain_writer import ChatWriter
 
             llm = ChatWriter(
-                model="...",
+                model_name="...",
                 temperature=0,
                 max_tokens=None,
-                timeout=None,
+                request_timeout=None,
                 max_retries=2,
                 api_key="...",
                 other params...

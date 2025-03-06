@@ -15,6 +15,33 @@ class GraphTool(BaseTool):
     (it runs only in the WriterChat environment and doesn't support direct calls).
     For more information visit tool calling section of `langchain_writer.ChatWriter()`
     docstring or `ChatWriter` docs.
+
+    Setup:
+        Install ``langchain-writer``.
+
+        .. code-block:: bash
+
+            pip install -U langchain-writer
+
+    Instantiate:
+        To instantiate tool you should pass required parameter `graph_ids`.
+        Other parameters are optional.
+
+        .. code-block:: python
+
+            from langchain_writer.tools import GraphTool
+
+
+            graph_tool = GraphTool(
+
+                graph_ids=["your-graph-id1", "your-graph-id2"],
+
+                name="CV knowledge graph",
+
+                other params...
+
+            )
+
     """
 
     """Tool type."""
@@ -76,6 +103,47 @@ class NoCodeAppTool(BaseTool):
     """`Writer` NoCodeAppTool allows developers to use Palmyra powered zero-code apps as LLM tools.
     For more information visit tool calling section of `langchain_writer.ChatWriter()`
     docstring or `ChatWriter` docs.
+
+    Setup:
+        Install ``langchain-writer`` and set environment variable ``WRITER_API_KEY``.
+
+        .. code-block:: bash
+
+            pip install -U langchain-writer
+
+            export WRITER_API_KEY="your-api-key"
+
+    Instantiate:
+        To instantiate tool you should pass required parameter `app_id` and `api_key`
+        if you don't have it as environment variable. Other parameters are optional.
+        Attribute `app_inputs` will be auto initialized on instantiation.
+
+        .. code-block:: python
+
+            from langchain_writer.tools import NoCodeAppTool
+
+
+            no_code_app_tool = NoCodeAppTool(
+
+                api_key="your-api-key",
+
+                app_id="your-app-id",
+
+                name="Poem generator app",
+
+                other params...
+
+            )
+
+    Invoke:
+        To run no-code app tool you should pass inputs dict which match app inputs as element
+        of `tool_input` dict with `key=inputs` as following:
+
+        .. code-block:: python
+
+            no_code_app_tool.run(tool_input={"inputs": {"Input name": "Input value"}})
+
+        .. code-block:: python
     """
 
     """Tool type."""
