@@ -90,10 +90,31 @@ class LLMTool(BaseTool):
         "palmyra-x-004",
         "palmyra-x-003-instruct",
         "palmyra-med",
-        "palmyra-fin-32k",
+        "palmyra-fin",
         "palmyra-creative",
-        "palmyra-vision",
     ] = "palmyra-x-004"
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
+        descriptions = {
+            "palmyra-x-004": "Enterprise-grade language model for answering "
+            "global questions and compose suggestions linked with various topics.",
+            "palmyra-x-003-instruct": "Top-performing instruct language model, built "
+            "specifically for structured text completion rather than conversational use.",
+            "palmyra-med": "Language model, engineered to support clinical and "
+            "administrative workflows with high accuracy in medical terminology, coding, and analysis",
+            "palmyra-fin": "Language model, designed to support critical financial workflows "
+            "with precision in terminology, document analysis, and complex investment analysis.",
+            "palmyra-creative": "Language model, engineered to elevate creative "
+            "thinking and writing across diverse professional contexts",
+        }
+
+        description = kwargs.get("description")
+        if description:
+            self.description = description
+        else:
+            self.description = descriptions[self.model_name]
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("Writer LLMTool does not support direct invocations.")

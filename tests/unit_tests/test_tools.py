@@ -8,7 +8,20 @@ from writerai.types.application_retrieve_response import (
     Input,
 )
 
-from langchain_writer.tools import NoCodeAppTool
+from langchain_writer.tools import LLMTool, NoCodeAppTool
+
+
+@pytest.mark.parametrize(
+    "model_name, description",
+    [["palmyra-med", ""], ["palmyra-med", "Example description"]],
+)
+def test_llm_tool_description(model_name, description):
+    llm_tool = LLMTool(model_name=model_name, description=description)
+
+    if description:
+        assert llm_tool.description == description
+    else:
+        assert llm_tool.description
 
 
 @pytest.mark.parametrize(
