@@ -21,7 +21,8 @@ from langchain_writer.tools import LLMTool
 
 # Create an LLMTool with a specific model
 llm_tool = LLMTool(
-    model_name="palmyra-med"  # Specify the Palmyra model to use
+    model_name="palmyra-med",  # Specify the Palmyra model to use
+    description="A specialized medical model with knowledge on the human body."  # Optional: override the default description
 )
 ```
 
@@ -31,8 +32,22 @@ llm_tool = LLMTool(
 |-----------|------|---------|-------------|
 | `type` | `Literal["llm"]` | `"llm"` | The tool type, always "llm" for LLMTool |
 | `name` | `str` | `"Large Language Model"` | The name of the tool |
-| `description` | `str` | `"LLM tool provides a way to perform sub calls to another type of model to compose response on user request."` | Description passed to the model |
+| `description` | `str` | Model-specific description | Description passed to the model |
 | `model_name` | `Literal["palmyra-x-004", "palmyra-x-003-instruct", "palmyra-med", "palmyra-fin", "palmyra-creative"]` | `"palmyra-x-004"` | Name of the LLM to invoke |
+
+## Model-Specific Descriptions
+
+Each model has a default description that is automatically set when you initialize the tool:
+
+| Model | Default Description |
+|-------|---------------------|
+| `palmyra-x-004` | Enterprise-grade language model for answering global questions and compose suggestions linked with various topics. |
+| `palmyra-x-003-instruct` | Top-performing instruct language model, built specifically for structured text completion rather than conversational use. |
+| `palmyra-med` | Language model, engineered to support clinical and administrative workflows with high accuracy in medical terminology, coding, and analysis |
+| `palmyra-fin` | Language model, designed to support critical financial workflows with precision in terminology, document analysis, and complex investment analysis. |
+| `palmyra-creative` | Language model, engineered to elevate creative thinking and writing across diverse professional contexts |
+
+You can override these descriptions by providing a custom description when initializing the tool.
 
 ## Usage with ChatWriter
 
@@ -71,7 +86,7 @@ print(response.additional_kwargs["llm_data"])
 
 2. The `model_name` parameter is crucial as it specifies which Palmyra model the primary model can delegate to. Choose the appropriate model based on the specific domain or task requirements.
 
-3. The `description` parameter is very important, as it provides context to the model using tool calling (e.g. Palmyra X 004 and later) which helps it understand the purpose of the tool.
+3. The `description` parameter is very important, as it provides context to the model using tool calling (e.g. Palmyra X 004 and later) which helps it understand the purpose of the tool. If not provided, a model-specific description will be used.
 
 4. When the model uses the LLM tool, the execution happens remotely on Writer's servers, and the response includes additional data in the `additional_kwargs["llm_data"]` field.
 
@@ -80,3 +95,5 @@ print(response.additional_kwargs["llm_data"])
 - Delegating medical questions to a specialized medical model (`palmyra-med`)
 - Using a creative model for generating creative content (`palmyra-creative`)
 - Leveraging a financial model for financial analysis (`palmyra-fin`)
+- Using an instruction-tuned model for structured completions (`palmyra-x-003-instruct`)
+- Leveraging the general-purpose model for a wide range of tasks (`palmyra-x-004`)
