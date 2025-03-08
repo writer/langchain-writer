@@ -52,39 +52,64 @@ The `NoCodeAppTool` is designed to be used with the `ChatWriter` class:
 from langchain_writer import ChatWriter
 from langchain_writer.tools import NoCodeAppTool
 from langchain_core.messages import HumanMessage
+import os
+from dotenv import load_dotenv
 
-# Initialize the ChatWriter
-llm = ChatWriter(
+load_dotenv()
+
+chat = ChatWriter(
     model="palmyra-x-004",
     temperature=0.7,
-    api_key="your-api-key"
+    api_key=os.getenv("WRITER_API_KEY")
 )
 
 # Create a NoCodeAppTool
-app_tool = NoCodeAppTool(app_id="your-app-id")
+app_tool = NoCodeAppTool(
+    api_key=os.getenv("WRITER_API_KEY"), 
+    app_id=os.getenv("APP_ID"), 
+    name="Social post generator", 
+    description="No-code app that generates social posts from product descriptions"
+)
 
-# Bind the tool to the ChatWriter
-llm_with_tools = llm.bind_tools([app_tool])
+# Bind the tool ChatWriter
+chat_with_tools = chat.bind_tools([app_tool])
+
+product_description = "The Terra running shoe is a high-performance, lightweight shoe that offers a comfortable and durable experience. The shoe is also lightweight and easy to carry, making it an ideal option for runners looking for a new pair of shoes."
 
 # Create a conversation
 messages = [
-    HumanMessage("Can you help me generate a poem about AI?")
+    HumanMessage("Can you help me generate a social post about a new running shoe? Here is the product description:\n\n" + product_description)
 ]
 
 # Get the model's response
-response = llm_with_tools.invoke(messages)
+response = chat_with_tools.invoke(messages)
 messages.append(response)
 
 # If the model requests to use the tool
 if response.tool_calls:
     for tool_call in response.tool_calls:
+        print("\nTool call:", tool_call)
+        
+        # Dynamically build the inputs dictionary from the args
+        inputs = {}
+        for arg in tool_call['args']:
+            inputs[arg] = tool_call['args'][arg]
+        
         # Execute the tool call
-        tool_response = app_tool.invoke(tool_call)
-        messages.append(tool_response)
+        try:
+            tool_response = app_tool.run(tool_input={"inputs": inputs})
+            messages.append(tool_response.suggestion)
+        except Exception as e:
+            print(f"Error running tool: {e}")
     
     # Get the final response
-    final_response = llm_with_tools.invoke(messages)
-    print(final_response.content)
+    try:
+        final_response = chat_with_tools.invoke(messages)
+        print("\nFinal response:", final_response.content)
+    except Exception as e:
+        print(f"Error getting final response: {e}")
+else:
+    print("No tool calls were requested.")
 ```
 
 ## Input Handling
