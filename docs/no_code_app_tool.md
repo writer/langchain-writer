@@ -57,15 +57,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-chat = ChatWriter(
-    model="palmyra-x-004",
-    temperature=0.7,
-    api_key=os.getenv("WRITER_API_KEY")
-)
+chat = ChatWriter()
 
 # Create a NoCodeAppTool
 app_tool = NoCodeAppTool(
-    api_key=os.getenv("WRITER_API_KEY"), 
     app_id=os.getenv("APP_ID"), 
     name="Social post generator", 
     description="No-code app that generates social posts from product descriptions"

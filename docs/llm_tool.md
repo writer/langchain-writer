@@ -58,14 +58,13 @@ from langchain_writer import ChatWriter
 from langchain_writer.tools import LLMTool
 
 # Initialize the ChatWriter
-llm = ChatWriter(
-    model="palmyra-x-004",
-    temperature=0.7,
-    api_key="your-api-key"
-)
+llm = ChatWriter()
 
 # Create an LLMTool
-llm_tool = LLMTool(model_name="palmyra-med")
+llm_tool = LLMTool(
+    model_name="palmyra-med",
+    description="A specialized medical model with knowledge on the human body."
+)
 
 # Bind the tool to the ChatWriter
 llm_with_tools = llm.bind_tools([llm_tool])
