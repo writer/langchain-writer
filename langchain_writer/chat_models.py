@@ -44,6 +44,7 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, ConfigDict, Field
+from writerai.types.chat_completion_chunk import Choice, ChoiceDelta
 
 from langchain_writer.base import BaseWriter
 from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool
@@ -240,11 +241,20 @@ def create_chat_generation_chunk(
         chunk = chunk.model_dump()
 
     message_chunk = convert_dict_chunk_to_message_chunk(chunk)
+
     generation_info = {}
-    if finish_reason := chunk["choices"][0]["finish_reason"]:
+    if finish_reason := chunk["choices"][0].get("finish_reason", ""):
         generation_info["finish_reason"] = finish_reason
-    if logprobs := chunk["choices"][0]["logprobs"]:
+    if logprobs := chunk["choices"][0].get("logprobs", {}):
         generation_info["logprobs"] = logprobs
+    if usage := chunk.get("usage"):
+        usage_metadata = {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        }
+        generation_info["token_usage"] = usage_metadata
+
     generation_chunk = ChatGenerationChunk(
         message=message_chunk,
         generation_info=generation_info,
@@ -553,13 +563,21 @@ class ChatWriter(BaseWriter, BaseChatModel):
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
         message_dicts, params = self._convert_messages_to_dicts(messages, stop)
-        params = {**params, **kwargs, "stream": True}
+        params = {
+            **params,
+            **kwargs,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
 
         response = self.client.chat.chat(messages=message_dicts, **params)
 
         for chunk in response:
-            if len(chunk.choices) == 0:
+            if len(chunk.choices) == 0 and chunk.usage is None:
                 continue
+
+            if len(chunk.choices) == 0 and chunk.usage:
+                chunk.choices = [Choice(delta=ChoiceDelta(role="assistant"), index=0)]
 
             generation_chunk, logprobs = create_chat_generation_chunk(chunk)
             if run_manager:
@@ -576,13 +594,21 @@ class ChatWriter(BaseWriter, BaseChatModel):
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
         message_dicts, params = self._convert_messages_to_dicts(messages, stop)
-        params = {**params, **kwargs, "stream": True}
+        params = {
+            **params,
+            **kwargs,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
 
         response = await self.async_client.chat.chat(messages=message_dicts, **params)
 
         async for chunk in response:
-            if len(chunk.choices) == 0:
+            if len(chunk.choices) == 0 and chunk.usage is None:
                 continue
+
+            if len(chunk.choices) == 0 and chunk.usage:
+                chunk.choices = [Choice(delta=ChoiceDelta(role="assistant"), index=0)]
 
             generation_chunk, logprobs = create_chat_generation_chunk(chunk)
             if run_manager:

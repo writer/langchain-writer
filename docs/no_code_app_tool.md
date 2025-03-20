@@ -61,8 +61,8 @@ chat = ChatWriter()
 
 # Create a NoCodeAppTool
 app_tool = NoCodeAppTool(
-    app_id=os.getenv("APP_ID"), 
-    name="Social post generator", 
+    app_id=os.getenv("APP_ID"),
+    name="Social post generator",
     description="No-code app that generates social posts from product descriptions"
 )
 
@@ -84,19 +84,19 @@ messages.append(response)
 if response.tool_calls:
     for tool_call in response.tool_calls:
         print("\nTool call:", tool_call)
-        
+
         # Dynamically build the inputs dictionary from the args
         inputs = {}
         for arg in tool_call['args']:
             inputs[arg] = tool_call['args'][arg]
-        
+
         # Execute the tool call
         try:
             tool_response = app_tool.run(tool_input={"inputs": inputs})
             messages.append(tool_response.suggestion)
         except Exception as e:
             print(f"Error running tool: {e}")
-    
+
     # Get the final response
     try:
         final_response = chat_with_tools.invoke(messages)

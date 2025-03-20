@@ -41,6 +41,10 @@ def test_chat_model_response_metadata(chat_writer: ChatWriter):
             "finish_reason",
         )
     )
+    assert all(
+        k in result.response_metadata["token_usage"]
+        for k in ["prompt_tokens", "completion_tokens", "total_tokens"]
+    )
 
 
 def test_chat_model_invoke_stop(chat_writer: ChatWriter):
@@ -154,6 +158,10 @@ async def test_chat_model_async_response_metadata(chat_writer: ChatWriter):
             "finish_reason",
         )
     )
+    assert all(
+        k in result.response_metadata["token_usage"]
+        for k in ["prompt_tokens", "completion_tokens", "total_tokens"]
+    )
 
 
 @pytest.mark.asyncio
@@ -194,6 +202,27 @@ def test_chat_model_response_metadata_streaming(chat_writer: ChatWriter):
         assert isinstance(chunk.content, str)
         full = chunk if full is None else full + chunk
     assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata
+    assert "token_usage" in cast(BaseMessageChunk, full).response_metadata
+    assert {"input_tokens", "output_tokens", "total_tokens"}.issubset(
+        set(
+            cast(BaseMessageChunk, full).response_metadata.get("token_usage", {}).keys()
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_chat_model_response_metadata_astreaming(chat_writer: ChatWriter):
+    full: Optional[BaseMessageChunk] = None
+    async for chunk in chat_writer.astream("How to sleep well?", logprobs=True):
+        assert isinstance(chunk.content, str)
+        full = chunk if full is None else full + chunk
+    assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata
+    assert "token_usage" in cast(BaseMessageChunk, full).response_metadata
+    assert {"input_tokens", "output_tokens", "total_tokens"}.issubset(
+        set(
+            cast(BaseMessageChunk, full).response_metadata.get("token_usage", {}).keys()
+        )
+    )
 
 
 def test_chat_model_system_message_streaming(chat_writer: ChatWriter):
