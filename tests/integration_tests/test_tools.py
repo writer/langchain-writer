@@ -1,3 +1,4 @@
+import sys
 from typing import Optional
 
 import pytest
@@ -14,6 +15,11 @@ from tests.integration_tests.conftest import (
     TEXT_GENERATION_APP_ID,
     get_app_inputs,
 )
+
+if sys.version_info[0] < 3.10:
+
+    async def anext(ait):
+        return await ait.__anext__()
 
 
 @tool
