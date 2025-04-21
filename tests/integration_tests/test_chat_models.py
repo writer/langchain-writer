@@ -203,7 +203,7 @@ def test_chat_model_response_metadata_streaming(chat_writer: ChatWriter):
         full = chunk if full is None else full + chunk
     assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata
     assert "token_usage" in cast(BaseMessageChunk, full).response_metadata
-    assert {"input_tokens", "output_tokens", "total_tokens"}.issubset(
+    assert {"prompt_tokens", "completion_tokens", "total_tokens"}.issubset(
         set(
             cast(BaseMessageChunk, full).response_metadata.get("token_usage", {}).keys()
         )
@@ -218,7 +218,7 @@ async def test_chat_model_response_metadata_astreaming(chat_writer: ChatWriter):
         full = chunk if full is None else full + chunk
     assert "finish_reason" in cast(BaseMessageChunk, full).response_metadata
     assert "token_usage" in cast(BaseMessageChunk, full).response_metadata
-    assert {"input_tokens", "output_tokens", "total_tokens"}.issubset(
+    assert {"prompt_tokens", "completion_tokens", "total_tokens"}.issubset(
         set(
             cast(BaseMessageChunk, full).response_metadata.get("token_usage", {}).keys()
         )

@@ -180,6 +180,8 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
     if role == "user":
         return HumanMessageChunk(content=content)
     elif role == "assistant":
+        response_metadata = {}
+
         if usage := chunk.get("usage"):
             usage_metadata = {
                 "input_tokens": usage.get("prompt_tokens", 0),
@@ -188,6 +190,16 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
             }
         else:
             usage_metadata = None
+
+        response_metadata["token_usage"] = chunk.get("usage")
+
+        if chunk["choices"][0].get("finish_reason"):
+            response_metadata["model_name"] = chunk.get("model")
+            response_metadata["system_fingerprint"] = chunk.get("system_fingerprint")
+            response_metadata["finish_reason"] = chunk["choices"][0].get(
+                "finish_reason"
+            )
+            response_metadata["logprobs"] = chunk["choices"][0].get("logprobs")
 
         additional_kwargs = {}
         tool_call_chunks = []
@@ -217,6 +229,7 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
             additional_kwargs=additional_kwargs,
             tool_call_chunks=tool_call_chunks,
             usage_metadata=usage_metadata,
+            response_metadata=response_metadata,
         )
     elif role == "system":
         return SystemMessageChunk(content=content)
@@ -242,25 +255,18 @@ def create_chat_generation_chunk(
 
     message_chunk = convert_dict_chunk_to_message_chunk(chunk)
 
-    generation_info = {}
-    if finish_reason := chunk["choices"][0].get("finish_reason", ""):
-        generation_info["finish_reason"] = finish_reason
-    if logprobs := chunk["choices"][0].get("logprobs", {}):
-        generation_info["logprobs"] = logprobs
-    if usage := chunk.get("usage"):
-        usage_metadata = {
-            "input_tokens": usage.get("prompt_tokens", 0),
-            "output_tokens": usage.get("completion_tokens", 0),
-            "total_tokens": usage.get("total_tokens", 0),
-        }
-        generation_info["token_usage"] = usage_metadata
-
     generation_chunk = ChatGenerationChunk(
         message=message_chunk,
-        generation_info=generation_info,
+        generation_info=(
+            message_chunk.response_metadata if message_chunk.response_metadata else {}
+        ),
     )
 
-    return generation_chunk, logprobs
+    return generation_chunk, (
+        message_chunk.response_metadata.get("logprobs", {})
+        if message_chunk.response_metadata
+        else {}
+    )
 
 
 def format_message_content(content: Any) -> str:
