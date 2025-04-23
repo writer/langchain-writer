@@ -27,13 +27,8 @@ class TestWriterChatStandard(ChatModelIntegrationTests):
         return "auto"
 
     @property
-    def has_structured_output(self) -> bool:
-        """Writer does not yet support structured output."""
-        return False
-
-    @property
-    def returns_usage_metadata(self) -> bool:
-        """Writer returns token usage information."""
+    def supports_json_mode(self) -> bool:
+        """(bool) whether the chat model supports JSON mode."""
         return True
 
     @property

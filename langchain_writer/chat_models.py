@@ -1,5 +1,6 @@
 """Writer chat models."""
 
+from operator import itemgetter
 from typing import (
     Any,
     AsyncIterator,
@@ -35,14 +36,19 @@ from langchain_core.messages import (
     ToolMessageChunk,
 )
 from langchain_core.messages.tool import tool_call_chunk as create_tool_call_chunk
+from langchain_core.output_parsers import JsonOutputParser, PydanticOutputParser
+from langchain_core.output_parsers.base import OutputParserLike
 from langchain_core.output_parsers.openai_tools import (
+    JsonOutputKeyToolsParser,
+    PydanticToolsParser,
     make_invalid_tool_call,
     parse_tool_call,
 )
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableMap, RunnablePassthrough
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
+from langchain_core.utils.pydantic import is_basemodel_subclass
 from pydantic import BaseModel, ConfigDict, Field
 from writerai.types.chat_completion_chunk import Choice, ChoiceDelta
 
@@ -652,6 +658,106 @@ class ChatWriter(BaseWriter, BaseChatModel):
 
         return super().bind(tools=formatted_tools, **kwargs)
 
+    def with_structured_output(
+        self,
+        schema: Optional[Union[Dict, Type[BaseModel]]] = None,
+        *,
+        method: Literal[
+            "json_mode", "json_schema", "function_calling"
+        ] = "function_calling",
+        include_raw: bool = False,
+        **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]:
+        if kwargs:
+            raise ValueError(f"Received unsupported arguments {kwargs}")
+
+        is_pydantic_schema = _is_pydantic_class(schema)
+
+        if (
+            method == "json_mode"
+            and schema
+            and (is_pydantic_schema or isinstance(schema, dict))
+        ):
+            method = "json_schema"
+
+        if method == "json_schema":
+            if schema is None:
+                raise ValueError(
+                    "Schema must be specified when method is 'json_schema'. "
+                    "Received None."
+                )
+
+            response_format = _convert_to_openai_response_format(schema, strict=True)
+
+            llm = self.bind(
+                response_format=response_format,
+                structured_output_format={
+                    "kwargs": {"method": "json_schema"},
+                    "schema": schema,
+                },
+            )
+            output_parser = (
+                PydanticOutputParser(pydantic_object=schema)
+                if is_pydantic_schema
+                else JsonOutputParser()
+            )
+
+        elif method == "json_mode":
+            llm = self.bind(
+                response_format={"type": "json_object"},
+                structured_output_format={
+                    "kwargs": {"method": "json_mode"},
+                    "schema": None,
+                },
+            )
+            output_parser = JsonOutputParser()
+
+        elif method == "function_calling":
+            if schema is None:
+                raise ValueError(
+                    "Schema must be specified when method is 'function_calling'. "
+                    "Received None."
+                )
+
+            formatted_tool = convert_to_openai_tool(schema)
+            tool_name = formatted_tool["function"]["name"]
+
+            llm = self.bind_tools(
+                [schema],
+                tool_choice=tool_name,
+                structured_output_format={
+                    "kwargs": {"method": "function_calling"},
+                    "schema": schema,
+                },
+            )
+
+            if is_pydantic_schema:
+                output_parser: OutputParserLike = PydanticToolsParser(
+                    tools=[schema],
+                    first_tool_only=True,
+                )
+            else:
+                output_parser = JsonOutputKeyToolsParser(
+                    key_name=tool_name, first_tool_only=True
+                )
+        else:
+            raise ValueError(
+                f"Unrecognized method argument. Expected one of 'function_calling', 'json_schema' or "
+                f"'json_mode'. Received: '{method}'"
+            )
+
+        if include_raw:
+            parser_assign = RunnablePassthrough.assign(
+                parsed=itemgetter("raw") | output_parser, parsing_error=lambda _: None
+            )
+            parser_none = RunnablePassthrough.assign(parsed=lambda _: None)
+            parser_with_fallback = parser_assign.with_fallbacks(
+                [parser_none], exception_key="parsing_error"
+            )
+            return RunnableMap(raw=llm) | parser_with_fallback
+        else:
+            return llm | output_parser
+
     def _combine_llm_outputs(self, llm_outputs: List[Optional[dict]]) -> dict:
         overall_token_usage: dict = {}
         system_fingerprint = None
@@ -677,3 +783,42 @@ class ChatWriter(BaseWriter, BaseChatModel):
         if model_name:
             combined["model_name"] = model_name
         return combined
+
+
+def _is_pydantic_class(obj: Any) -> bool:
+    return isinstance(obj, type) and is_basemodel_subclass(obj)
+
+
+def _convert_to_openai_response_format(
+    schema: Union[Dict[str, Any], Type], *, strict: Optional[bool] = None
+) -> Dict:
+    """Same as in ChatOpenAI, but don't pass through Pydantic BaseModels."""
+    if (
+        isinstance(schema, dict)
+        and "json_schema" in schema
+        and schema.get("type") == "json_schema"
+    ):
+        response_format = schema
+    elif isinstance(schema, dict) and "name" in schema and "schema" in schema:
+        response_format = {"type": "json_schema", "json_schema": schema}
+    else:
+        if strict is None:
+            if isinstance(schema, dict) and isinstance(schema.get("strict"), bool):
+                strict = schema["strict"]
+            else:
+                strict = False
+        function = convert_to_openai_tool(schema, strict=strict)["function"]
+        function["schema"] = function.pop("parameters")
+        response_format = {"type": "json_schema", "json_schema": function}
+
+    if strict is not None and strict is not response_format["json_schema"].get(
+        "strict"
+    ):
+        msg = (
+            f"Output schema already has 'strict' value set to "
+            f"{schema['json_schema']['strict']} but 'strict' also passed in to "
+            f"with_structured_output as {strict}. Please make sure that "
+            f"'strict' is only specified in one place."
+        )
+        raise ValueError(msg)
+    return response_format
