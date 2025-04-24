@@ -313,7 +313,7 @@ def format_tool(
         tool: Tool to format.
 
     Returns:
-        OpenAI typed dict with tool definition.
+        Typed dict with tool definition.
     """
 
     dict_tool = {}
@@ -662,28 +662,229 @@ class ChatWriter(BaseWriter, BaseChatModel):
         self,
         schema: Optional[Union[Dict, Type[BaseModel]]] = None,
         *,
-        method: Literal[
-            "json_mode", "json_schema", "function_calling"
-        ] = "function_calling",
+        method: Literal["json_schema", "function_calling"] = "function_calling",
         include_raw: bool = False,
         **kwargs: Any,
     ) -> Runnable[LanguageModelInput, Union[Dict, BaseModel]]:
+        """Model wrapper that returns outputs formatted to match the given schema.
+
+        Args:
+            schema:
+                The output schema. Can be passed in as:
+                    - a function schema,
+                    - a JSON Schema,
+                    - a TypedDict class,
+                    - or a Pydantic class.
+                If ``schema`` is a Pydantic class then the model output will be a
+                Pydantic instance of that class, and the model-generated fields will be
+                validated by the Pydantic class. Otherwise, the model output will be a
+                dict and will not be validated.
+
+            method:
+                The method for steering model generation, either "function_calling"
+                or "json_mode/json_schema". If "function_calling" then the schema will be converted
+                to a function dict and the returned model will make use of the
+                function-calling API. If "json_schema" then JSON mode will be
+                used. Note that if using "json_schema" then you must pass schema of
+                desired output format.
+            include_raw:
+                If False then only the parsed structured output is returned. If
+                an error occurs during model output parsing it will be raised. If True
+                then both the raw model response (a BaseMessage) and the parsed model
+                response will be returned. If an error occurs during output parsing it
+                will be caught and returned as well. The final output is always a dict
+                with keys "raw", "parsed", and "parsing_error".
+
+        Returns:
+            A Runnable that takes same inputs as a :class:`langchain_core.language_models.chat.BaseChatModel`.
+
+        Example: schema=Pydantic class, method="function_calling", include_raw=False:
+            .. code-block:: python
+
+                from typing import Optional
+
+                from langchain_writer import ChatWriter
+                from pydantic import BaseModel, Field
+
+
+                class AnswerWithJustification(BaseModel):
+                    '''An answer to the user question along with justification for the answer.'''
+
+                    answer: str
+                    # If we provide default values and/or descriptions for fields, these will be passed
+                    # to the model. This is an important part of improving a model's ability to
+                    # correctly return structured outputs.
+                    justification: Optional[str] = Field(
+                        default=None, description="A justification for the answer."
+                    )
+
+
+                llm = ChatWriter()
+                structured_llm = llm.with_structured_output(AnswerWithJustification)
+
+                structured_llm.invoke(
+                    "What weighs more a pound of bricks or a pound of feathers"
+                )
+
+                # -> AnswerWithJustification(
+                #     answer='They weigh the same',
+                #     justification='Both a pound of bricks and a pound of feathers weigh one pound.
+                                    The weight is the same, but the volume or density of the objects may differ.'
+                # )
+
+        Example: schema=Pydantic class, method="function_calling", include_raw=True:
+            .. code-block:: python
+
+                from langchain_writer import ChatWriter
+                from pydantic import BaseModel
+
+
+                class AnswerWithJustification(BaseModel):
+                    '''An answer to the user question along with justification for the answer.'''
+
+                    answer: str
+                    justification: str
+
+
+                llm = ChatWriter()
+                structured_llm = llm.with_structured_output(
+                    AnswerWithJustification, include_raw=True
+                )
+
+                structured_llm.invoke(
+                    "What weighs more a pound of bricks or a pound of feathers"
+                )
+                # -> {
+                #    'raw': AIMessage(content='', additional_kwargs={'tool_calls': [{'id': 'chatcmpl-tool-zsHrm9K2nfygJMQylrBLhb47lPZskFvW', 'function': {'arguments': '{"answer": "They weigh the same.", "justification": "Both a pound of bricks and a pound of feathers weigh one pound. The common misconception arises from the difference in volume between bricks and feathers, but the weight specified is the same for both."}', 'name': 'AnswerWithJustification'}, 'type': 'function', 'index': None}], 'graph_data': {'sources': None, 'status': None, 'subqueries': None}}, response_metadata={'token_usage': {'completion_tokens': 70, 'prompt_tokens': 202, 'total_tokens': 272, 'completion_tokens_details': None, 'prompt_token_details': None}, 'model_name': 'palmyra-x5', 'system_fingerprint': 'v1', 'finish_reason': 'tool_calls', 'logprobs': None}, id='run-44ae92bf-2eed-47c6-bdcd-81165f826b48-0', tool_calls=[{'name': 'AnswerWithJustification', 'args': {'answer': 'They weigh the same.', 'justification': 'Both a pound of bricks and a pound of feathers weigh one pound. The common misconception arises from the difference in volume between bricks and feathers, but the weight specified is the same for both.'}, 'id': 'chatcmpl-tool-zsHrm9K2nfygJMQylrBLhb47lPZskFvW', 'type': 'tool_call'}], usage_metadata={'input_tokens': 202, 'output_tokens': 70, 'total_tokens': 272}),
+                #    'parsed': AnswerWithJustification(answer='They weigh the same.', justification='Both a pound of bricks and a pound of feathers weigh one pound. The common misconception arises from the difference in volume between bricks and feathers, but the weight specified is the same for both.'),
+                #    'parsing_error': None
+                #   }
+
+        Example: schema=TypedDict class, method="function_calling", include_raw=False:
+            .. code-block:: python
+
+                from typing import Annotated, TypedDict
+
+                from langchain_writer import ChatWriter
+
+
+                class AnswerWithJustification(TypedDict):
+                    '''An answer to the user question along with justification for the answer.'''
+
+                    answer: str
+                    justification: Annotated[
+                        Optional[str], None, "A justification for the answer."
+                    ]
+
+
+                llm = ChatWriter()
+                structured_llm = llm.with_structured_output(AnswerWithJustification)
+
+                structured_llm.invoke(
+                    "What weighs more a pound of bricks or a pound of feathers"
+                )
+                # -> {
+                #     'answer': 'They weigh the same',
+                #     'justification': 'Both a pound of bricks and a pound of feathers weigh one pound. The weight is the same, but the volume and density of the two substances differ.'
+                # }
+
+        Example: schema=Function schema, method="function_calling", include_raw=False:
+            .. code-block:: python
+
+                from langchain_writer import ChatWriter
+
+                schema = {
+                    'name': 'AnswerWithJustification',
+                    'description': 'An answer to the user question along with justification for the answer.',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {
+                            'answer': {'type': 'string'},
+                            'justification': {'description': 'A justification for the answer.', 'type': 'string'}
+                        },
+                       'required': ['answer']
+                   }
+               }
+
+                llm = ChatWriter()
+                structured_llm = llm.with_structured_output(schema)
+
+                structured_llm.invoke(
+                    "What weighs more a pound of bricks or a pound of feathers"
+                )
+                # -> {
+                #     'answer': 'They weigh the same',
+                #     'justification': 'Both a pound of bricks and a pound of feathers weigh one pound. The weight is the same, but the volume and density of the two substances differ.'
+                # }
+
+        Example: schema=Pydantic class, method="json_schema", include_raw=True:
+            .. code-block::
+
+                from langchain_writer import ChatWriter
+                from pydantic import BaseModel
+
+                class AnswerWithJustification(BaseModel):
+                    answer: str
+                    justification: str
+
+                llm = ChatWriter()
+                structured_llm = llm.with_structured_output(
+                    AnswerWithJustification,
+                    method="json_schema",
+                    include_raw=True
+                )
+
+                structured_llm.invoke(
+                    "Answer the following question. "
+                    "Make sure to return a JSON blob with keys 'answer' and 'justification'.\n\n"
+                    "What's heavier a pound of bricks or a pound of feathers?"
+                )
+                # -> {
+                #    'raw': AIMessage(content='{"answer": "They weigh the same.", "justification": "Both a pound of bricks and a pound of feathers weigh one pound. The common misconception arises from the difference in volume between the two items; bricks are much denser than feathers, so a pound of feathers will occupy a much larger volume than a pound of bricks."}', additional_kwargs={'graph_data': {'sources': None, 'status': None, 'subqueries': None}}, response_metadata={'token_usage': {'completion_tokens': 69, 'prompt_tokens': 66, 'total_tokens': 135, 'completion_tokens_details': None, 'prompt_token_details': None}, 'model_name': 'palmyra-x5', 'system_fingerprint': 'v1', 'finish_reason': 'stop', 'logprobs': None}, id='run-8f9190db-5bc5-43f5-9575-2dc4919594bd-0', usage_metadata={'input_tokens': 66, 'output_tokens': 69, 'total_tokens': 135}),
+                #    'parsed': AnswerWithJustification(answer='They weigh the same.', justification='Both a pound of bricks and a pound of feathers weigh one pound. The common misconception arises from the difference in volume between the two items; bricks are much denser than feathers, so a pound of feathers will occupy a much larger volume than a pound of bricks.'),
+                #    'parsing_error': None
+                # }
+
+        Example: schema=Function schema, method="json_schema", include_raw=False:
+            .. code-block::
+
+                from langchain_writer import ChatWriter
+
+                schema = {
+                    'name': 'AnswerWithJustification',
+                    'description': 'An answer to the user question along with justification for the answer.',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {
+                            'answer': {'type': 'string'},
+                            'justification': {'description': 'A justification for the answer.', 'type': 'string'}
+                        },
+                       'required': ['answer']
+                   }
+                }
+
+                structured_llm = llm.with_structured_output(schema=schema, method="json_schema")
+
+                llm = ChatWriter()
+                structured_llm.invoke(
+                    "Answer the following question. "
+                    "Make sure to return a JSON blob with keys 'answer' and 'justification'.\n\n"
+                    "What's heavier a pound of bricks or a pound of feathers?"
+                )
+                # -> {
+                #    'answer': 'Neither, they both weigh the same.',
+                #    'justification': 'A pound is a unit of weight, and both a pound of bricks and a pound of feathers weigh exactly one pound. The common misconception arises from the difference in volume between bricks and feathers, where a pound of feathers will occupy much more space than a pound of bricks due to their lightness.'
+                # }
+        """
         if kwargs:
             raise ValueError(f"Received unsupported arguments {kwargs}")
 
         is_pydantic_schema = _is_pydantic_class(schema)
 
-        if (
-            method == "json_mode"
-            and schema
-            and (is_pydantic_schema or isinstance(schema, dict))
-        ):
-            method = "json_schema"
-
-        if method == "json_schema":
+        if method in ["json_schema", "json_mode"]:
             if schema is None:
                 raise ValueError(
-                    "Schema must be specified when method is 'json_schema'. "
+                    "Schema must be specified when method is 'json_schema/json_mode'. "
                     "Received None."
                 )
 
@@ -701,16 +902,6 @@ class ChatWriter(BaseWriter, BaseChatModel):
                 if is_pydantic_schema
                 else JsonOutputParser()
             )
-
-        elif method == "json_mode":
-            llm = self.bind(
-                response_format={"type": "json_object"},
-                structured_output_format={
-                    "kwargs": {"method": "json_mode"},
-                    "schema": None,
-                },
-            )
-            output_parser = JsonOutputParser()
 
         elif method == "function_calling":
             if schema is None:
@@ -792,7 +983,6 @@ def _is_pydantic_class(obj: Any) -> bool:
 def _convert_to_openai_response_format(
     schema: Union[Dict[str, Any], Type], *, strict: Optional[bool] = None
 ) -> Dict:
-    """Same as in ChatOpenAI, but don't pass through Pydantic BaseModels."""
     if (
         isinstance(schema, dict)
         and "json_schema" in schema
