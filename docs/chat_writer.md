@@ -24,7 +24,7 @@ export WRITER_API_KEY="your-api-key"
 from langchain_writer import ChatWriter
 
 llm = ChatWriter(
-    model="palmyra-x-004",  # default model
+    model="palmyra-x5",  # default model
     temperature=0.7,        # controls randomness (0-1)
     max_tokens=None,        # maximum number of tokens to generate
     timeout=None,           # request timeout
@@ -111,15 +111,15 @@ metadata = ai_msg.response_metadata
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `model_name` | `str` | `"palmyra-x-004"` | The Writer model to use |
-| `temperature` | `float` | `0.7` | Controls randomness (0-1) |
-| `model_kwargs` | `Dict[str, Any]` | `{}` | Additional model parameters |
-| `n` | `int` | `1` | Number of completions to generate |
-| `max_tokens` | `Optional[int]` | `None` | Maximum number of tokens to generate |
-| `stop` | `Optional[Union[str, List[str]]]` | `None` | Sequences where the model should stop generating |
-| `logprobs` | `bool` | `True` | Whether to return log probabilities |
+| Parameter | Type | Default        | Description |
+|-----------|------|----------------|-------------|
+| `model_name` | `str` | `"palmyra-x5"` | The Writer model to use |
+| `temperature` | `float` | `0.7`          | Controls randomness (0-1) |
+| `model_kwargs` | `Dict[str, Any]` | `{}`           | Additional model parameters |
+| `n` | `int` | `1`            | Number of completions to generate |
+| `max_tokens` | `Optional[int]` | `None`         | Maximum number of tokens to generate |
+| `stop` | `Optional[Union[str, List[str]]]` | `None`         | Sequences where the model should stop generating |
+| `logprobs` | `bool` | `True`         | Whether to return log probabilities |
 
 ## Advanced features
 

@@ -46,7 +46,7 @@ from langchain_writer.tools import GraphTool
 
 # Initialize the ChatWriter
 llm = ChatWriter(
-    model="palmyra-x-004",
+    model="palmyra-x5",
     temperature=0.7,
     api_key="your-api-key"
 )

@@ -18,7 +18,7 @@ class TestWriterChatStandard(ChatModelUnitTests):
     def chat_model_params(self) -> Dict:
         """Return any additional parameters needed."""
         return {
-            "model_name": "palmyra-x-004",
+            "model_name": "palmyra-x5",
             "api_key": "test-api-key",
         }
 

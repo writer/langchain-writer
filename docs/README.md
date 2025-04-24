@@ -48,7 +48,7 @@ from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool
 from langchain_core.documents.base import Blob
 
 # Initialize components
-llm = ChatWriter(model_name="palmyra-x-004")
+llm = ChatWriter(model_name="palmyra-x5")
 parser = PDFParser(format="markdown")
 splitter = WriterTextSplitter(strategy="llm_split")
 graph_tool = GraphTool(graph_ids=["id1", "id2"])

@@ -87,17 +87,19 @@ class LLMTool(BaseTool):
 
     """Name of LLM to invoke."""
     model_name: Literal[
+        "palmyra-x5",
         "palmyra-x-004",
         "palmyra-x-003-instruct",
         "palmyra-med",
         "palmyra-fin",
         "palmyra-creative",
-    ] = "palmyra-x-004"
+    ] = "palmyra-x5"
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
         descriptions = {
+            "palmyra-x5": "DESCRIPTION NEEDED",
             "palmyra-x-004": "Enterprise-grade language model for answering "
             "global questions and compose suggestions linked with various topics.",
             "palmyra-x-003-instruct": "Top-performing instruct language model, built "

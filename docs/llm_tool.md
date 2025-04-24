@@ -28,12 +28,12 @@ llm_tool = LLMTool(
 
 ## Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `type` | `Literal["llm"]` | `"llm"` | The tool type, always "llm" for LLMTool |
-| `name` | `str` | `"Large Language Model"` | The name of the tool |
-| `description` | `str` | Model-specific description | Description passed to the model |
-| `model_name` | `Literal["palmyra-x-004", "palmyra-x-003-instruct", "palmyra-med", "palmyra-fin", "palmyra-creative"]` | `"palmyra-x-004"` | Name of the LLM to invoke |
+| Parameter | Type                                                                                                                | Default                    | Description |
+|-----------|---------------------------------------------------------------------------------------------------------------------|----------------------------|-------------|
+| `type` | `Literal["llm"]`                                                                                                    | `"llm"`                    | The tool type, always "llm" for LLMTool |
+| `name` | `str`                                                                                                               | `"Large Language Model"`   | The name of the tool |
+| `description` | `str`                                                                                                               | Model-specific description | Description passed to the model |
+| `model_name` | `Literal["palmyra-x5", palmyra-x-004", "palmyra-x-003-instruct", "palmyra-med", "palmyra-fin", "palmyra-creative"]` | `"palmyra-x5"`             | Name of the LLM to invoke |
 
 ## Model-Specific Descriptions
 
@@ -41,6 +41,7 @@ Each model has a default description that is automatically set when you initiali
 
 | Model | Default Description |
 |-------|---------------------|
+| `palmyra-x5` |  DESCRIPTION NEEDED |
 | `palmyra-x-004` | Enterprise-grade language model for answering global questions and compose suggestions linked with various topics. |
 | `palmyra-x-003-instruct` | Top-performing instruct language model, built specifically for structured text completion rather than conversational use. |
 | `palmyra-med` | Language model, engineered to support clinical and administrative workflows with high accuracy in medical terminology, coding, and analysis |
@@ -96,3 +97,4 @@ print(response.additional_kwargs["llm_data"])
 - Leveraging a financial model for financial analysis (`palmyra-fin`)
 - Using an instruction-tuned model for structured completions (`palmyra-x-003-instruct`)
 - Leveraging the general-purpose model for a wide range of tasks (`palmyra-x-004`)
+- DESCRIPTION NEEDED (`palmyra-x5`)
