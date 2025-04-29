@@ -910,15 +910,15 @@ class ChatWriter(BaseWriter, BaseChatModel):
                     "Received None."
                 )
 
-            formatted_tool = convert_to_openai_tool(schema)
+            formatted_tool = _convert_to_openai_tool(schema)
             tool_name = formatted_tool["function"]["name"]
 
             llm = self.bind_tools(
-                [schema],
+                [formatted_tool],
                 tool_choice=tool_name,
                 structured_output_format={
                     "kwargs": {"method": "function_calling"},
-                    "schema": schema,
+                    "schema": formatted_tool,
                 },
             )
 
@@ -980,6 +980,23 @@ def _is_pydantic_class(obj: Any) -> bool:
     return isinstance(obj, type) and is_basemodel_subclass(obj)
 
 
+def _convert_to_openai_tool(
+    tool: Union[dict[str, Any], type[BaseModel], Callable, BaseTool],
+    *,
+    strict: Optional[bool] = None,
+) -> dict[str, Any]:
+    if (
+        isinstance(tool, dict)
+        and tool.get("json_schema")
+        and tool["json_schema"].get("schema", {}).get("properties")
+    ):
+        tool = {
+            "parameters": tool["json_schema"]["schema"],
+            "name": tool["json_schema"].get("name"),
+        }
+    return convert_to_openai_tool(tool, strict=strict)
+
+
 def _convert_to_openai_response_format(
     schema: Union[Dict[str, Any], Type], *, strict: Optional[bool] = None
 ) -> Dict:
@@ -1001,8 +1018,10 @@ def _convert_to_openai_response_format(
         function["schema"] = function.pop("parameters")
         response_format = {"type": "json_schema", "json_schema": function}
 
-    if strict is not None and strict is not response_format["json_schema"].get(
-        "strict"
+    if (
+        strict is not None
+        and "strict" in response_format["json_schema"]
+        and strict is not response_format["json_schema"].get("strict")
     ):
         msg = (
             f"Output schema already has 'strict' value set to "
