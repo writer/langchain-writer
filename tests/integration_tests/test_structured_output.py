@@ -147,6 +147,31 @@ input_params = [
 ]
 
 
+def _validate_fields(response: dict | BaseModel, schema: dict | BaseModel) -> bool:
+    if isinstance(response, BaseModel):
+        response = response.model_dump()
+        schema_keys = set(schema.model_fields.keys())
+    elif isinstance(response, dict):
+        try:
+            schema_keys = set(schema.keys())
+        except TypeError:
+            schema_keys = set(schema.__annotations__.keys())
+
+    response_keys = set(response.keys())
+
+    if isinstance(schema, dict):
+        if "json_schema" in schema:
+            schema_keys = set(schema["json_schema"]["schema"]["properties"].keys())
+        elif "schema" in schema:
+            schema_keys = set(schema["schema"]["properties"].keys())
+        elif "function" in schema:
+            schema_keys = set(schema["function"]["parameters"]["properties"].keys())
+        elif "parameters" in schema:
+            schema_keys = set(schema["parameters"]["properties"].keys())
+
+    return response_keys.issubset(schema_keys)
+
+
 @pytest.mark.parametrize("schema, prompt, method, include_raw", input_params)
 def test_structured_outputs_sync(schema, prompt, method, include_raw, chat_writer):
     structured_chat = chat_writer.with_structured_output(
@@ -164,8 +189,11 @@ def test_structured_outputs_sync(schema, prompt, method, include_raw, chat_write
 
         if method == "tool_calling":
             assert len(response["raw"].tool_calls) > 0
+
+        assert _validate_fields(response["parsed"], schema)
     else:
         assert isinstance(response, dict) or isinstance(response, schema)
+        assert _validate_fields(response, schema)
 
 
 @pytest.mark.asyncio
@@ -188,16 +216,7 @@ async def test_structured_outputs_async(
 
         if method == "tool_calling":
             assert len(response["raw"].tool_calls) > 0
+        assert _validate_fields(response["parsed"], schema)
     else:
         assert isinstance(response, dict) or isinstance(response, schema)
-
-
-# @pytest.mark.parametrize("schema, prompt, method, include_raw", input_params)
-# def test_structured_outputs_sync_streaming(schema, prompt, method, include_raw, chat_writer):
-#     ...
-#
-#
-# @pytest.mark.asyncio
-# @pytest.mark.parametrize("schema, prompt, method, include_raw", input_params)
-# async def test_structured_outputs_async_streaming(schema, prompt, method, include_raw, chat_writer):
-#     ...
+        assert _validate_fields(response, schema)
