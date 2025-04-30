@@ -3,7 +3,7 @@ from typing import Annotated, List
 
 import pytest
 from langchain_core.messages import AIMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from typing_extensions import TypedDict
 
 
@@ -15,7 +15,7 @@ class Gender(str, Enum):
 
 class User(BaseModel):
     name: str = Field(..., description="The user's full name")
-    age: int = Field(..., description="The user's age in years")
+    age: int = Field(..., ge=0, description="The user's age in years")
     married: bool = Field(..., description="Marital status of the user")
     gender: Gender = Field(..., description="The user's gender")
     skills: List[str] = Field(
@@ -220,3 +220,92 @@ async def test_structured_outputs_async(
     else:
         assert isinstance(response, dict) or isinstance(response, schema)
         assert _validate_fields(response, schema)
+
+
+@pytest.mark.parametrize("schema, prompt, method, include_raw", input_params)
+def test_structured_outputs_sync_streaming(
+    schema, prompt, method, include_raw, chat_writer
+):
+    structured_chat = chat_writer.with_structured_output(
+        schema=schema, method=method, include_raw=include_raw
+    )
+
+    stream = structured_chat.stream(input=prompt)
+
+    response = next(stream)
+    for chunk in stream:
+        assert isinstance(response, BaseModel) or isinstance(response, dict)
+        if include_raw:
+            response.update(chunk)
+        else:
+            response = chunk
+
+    if include_raw:
+        assert isinstance(response["raw"], AIMessage)
+        assert response["parsing_error"] is None
+        assert isinstance(response["parsed"], dict) or isinstance(
+            response["parsed"], schema
+        )
+
+        if method == "tool_calling":
+            assert len(response["raw"].tool_calls) > 0
+        assert _validate_fields(response["parsed"], schema)
+    else:
+        assert isinstance(response, dict) or isinstance(response, schema)
+        assert _validate_fields(response, schema)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("schema, prompt, method, include_raw", input_params)
+async def test_structured_outputs_async_streaming(
+    schema, prompt, method, include_raw, chat_writer
+):
+    structured_chat = chat_writer.with_structured_output(
+        schema=schema, method=method, include_raw=include_raw
+    )
+
+    stream = structured_chat.astream(input=prompt)
+
+    response = await anext(stream)
+    async for chunk in stream:
+        assert isinstance(response, BaseModel) or isinstance(response, dict)
+        if include_raw:
+            response.update(chunk)
+        else:
+            response = chunk
+
+    if include_raw:
+        assert isinstance(response["raw"], AIMessage)
+        assert response["parsing_error"] is None
+        assert isinstance(response["parsed"], dict) or isinstance(
+            response["parsed"], schema
+        )
+
+        if method == "tool_calling":
+            assert len(response["raw"].tool_calls) > 0
+        assert _validate_fields(response["parsed"], schema)
+    else:
+        assert isinstance(response, dict) or isinstance(response, schema)
+        assert _validate_fields(response, schema)
+
+
+def test_schema_parsing_error_with_raw(chat_writer):
+    structured_chat = chat_writer.with_structured_output(
+        schema=User, method="function_calling", include_raw=True
+    )
+
+    response = structured_chat.invoke(input="Parse this user. Name: John. Age: -19")
+
+    assert response["raw"]
+    assert response["parsing_error"]
+    assert len(response["parsing_error"].errors()) > 0
+    assert response["parsed"] is None
+
+
+def test_schema_parsing_error(chat_writer):
+    structured_chat = chat_writer.with_structured_output(
+        schema=User, method="function_calling", include_raw=False
+    )
+
+    with pytest.raises(ValidationError):
+        structured_chat.invoke(input="Parse this user. Name: John. Age: -19")

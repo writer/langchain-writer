@@ -446,7 +446,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
     """
 
     """Model name to use."""
-    model_name: str = Field(default="palmyra-x-004", alias="model")
+    model_name: str = Field(default="palmyra-x4", alias="model")
 
     """What sampling temperature to use."""
     temperature: float = Field(default=0.7, ge=0, le=1)
