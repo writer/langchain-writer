@@ -1,6 +1,6 @@
 """Writer tools."""
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from langchain_core.tools import BaseTool
 from langchain_core.utils import secret_from_env
@@ -301,3 +301,48 @@ class NoCodeAppTool(BaseTool):
                 },
             },
         }
+
+
+class TranslationTool(BaseTool):
+    """`Writer` TranslationTool. The translation tool for chat completions allows you
+    to translate text during a conversation with a Palmyra model. While Palmyra X models
+    can perform translation tasks, they are not optimized for these tasks and may not
+    perform well without correct prompting. Palmyra Translate is a dedicated model optimized
+    for translation use cases. (it runs only in the WriterChat environment and doesn't
+    support direct calls).
+    """
+
+    """Tool type."""
+    type: Literal["translation"] = "translation"
+
+    """Tool name that is passed to model when performing tool calling."""
+    name: str = "Translation tool"
+
+    """The description that is passed to the model when performing tool calling."""
+    description: str = "Texts translator powered by palmyra-translation"
+
+    """Name of model used as translator"""
+    model: Literal["palmyra-translate"] = "palmyra-translate"
+
+    """Whether the translation should be formal or informal, if the target language supports it."""
+    formality: bool = False
+
+    """Whether to control the length of the translation, if the target language supports it."""
+    length_control: bool = False
+
+    """Whether to mask profanity in the translation, if the target language supports it."""
+    mask_profanity: bool = False
+
+    """The language code of the text you want to translate. If you don’t provide a source language,
+    the model automatically detects the language of the text you want to translate."""
+    source_language_code: Optional[str] = None
+
+    """The language code you want to translate the text to. If you don’t provide a target language,
+    the model automatically selects the most appropriate language based on the message you provide
+    to the chat completion endpoint."""
+    target_language_code: Optional[str] = None
+
+    def _run(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "Writer TranslationTool does not support direct invocations."
+        )

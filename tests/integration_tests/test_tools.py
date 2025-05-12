@@ -9,7 +9,7 @@ from writerai import BadRequestError
 from writerai.types import ApplicationGenerateContentResponse
 
 from langchain_writer import ChatWriter, GraphTool
-from langchain_writer.tools import LLMTool, NoCodeAppTool
+from langchain_writer.tools import LLMTool, NoCodeAppTool, TranslationTool
 from tests.integration_tests.conftest import (
     RESEARCH_APP_ID,
     TEXT_GENERATION_APP_ID,
@@ -93,6 +93,99 @@ get_product_info = {
         },
     },
 }
+
+
+def test_translation_tool(chat_writer: ChatWriter, translation_tool: TranslationTool):
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.invoke(
+        "Translate the following message to spanish: 'Hello, world!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "en"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "es"
+    )
+
+
+def test_translation_tool_source_lang_auto(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.invoke(
+        "Translate the following message to Italian: 'Guten tag, queridos amigos!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "auto"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "it"
+    )
+
+
+def test_translation_tool_source_lang(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.invoke(
+        "Translate the following message to Italian: 'Guten tag, liebe freunde!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "it"
+    )
+
+
+def test_translation_tool_target_lang(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.target_language_code = "fr"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.invoke(
+        "Translate the following message: 'Guten tag, liebe freunde!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "en"
+    )
+
+
+def test_translation_tool_wrong_source_language(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "gg"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    with pytest.raises(BadRequestError):
+        chat_writer.invoke(
+            "Translate the following message: 'Guten tag, liebe freunde!'"
+        )
 
 
 def test_chat_model_tool_binding(chat_writer: ChatWriter):
@@ -368,6 +461,106 @@ async def test_chat_model_tool_llm_and_function_acall(
     assert len(response.tool_calls) == 1
 
 
+@pytest.mark.asyncio
+async def test_translation_tool_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = await chat_writer.ainvoke(
+        "Translate the following message to spanish: 'Hello, world!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "en"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "es"
+    )
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_source_lang_auto_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = await chat_writer.ainvoke(
+        "Translate the following message to italian: 'Guten tag, queridos amigos!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "auto"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "it"
+    )
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_source_lang_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = await chat_writer.ainvoke(
+        "Translate the following message to Italian: 'Guten tag, liebe freunde!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "it"
+    )
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_target_lang_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.target_language_code = "fr"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = await chat_writer.ainvoke(
+        "Translate the following message: 'Guten tag, liebe freunde!'"
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "translation_data" in response.additional_kwargs.keys()
+    assert (
+        response.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    )
+    assert (
+        response.additional_kwargs["translation_data"]["target_language_code"] == "en"
+    )
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_wrong_source_language_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "gg"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    with pytest.raises(BadRequestError):
+        await chat_writer.ainvoke(
+            "Translate the following message: 'Guten tag, liebe freunde!'"
+        )
+
+
 def test_chat_model_tool_calls_streaming(chat_writer: ChatWriter):
     chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
@@ -450,6 +643,116 @@ def test_chat_model_tool_function_graph_call_streaming(
     assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
     assert full.tool_calls
     assert len(full.tool_calls) == 1
+
+
+def test_translation_tool_streaming(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.stream(
+        "Translate the following message to spanish: "
+        "'Hello, world! I like programming on Python, "
+        "and I want to share my knowledge with you."
+        "Python is an interpreted programming language "
+        "that can be used to perform a wide variety of tasks.'"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "en"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "es"
+
+
+def test_translation_tool_source_lang_auto_streaming(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.stream(
+        "Translate the following message to italian: 'Guten tag, queridos amigos!'"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "auto"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "it"
+
+
+def test_translation_tool_source_lang_streaming(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.stream(
+        "Translate the following message to Italian: 'Guten tag, liebe freunde!'"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "it"
+
+
+def test_translation_tool_target_lang_streaming(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.target_language_code = "fr"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.stream(
+        "Translate the following message: 'Guten tag, liebe freunde!'"
+    )
+
+    full = next(response)
+    for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "en"
+
+
+def test_translation_tool_wrong_source_language_streaming(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "gg"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.stream(
+        "Translate the following message to spanish: "
+        "'Hello, world! I like programming on Python, "
+        "and I want to share my knowledge with you."
+        "Python is an interpreted programming language "
+        "that can be used to perform a wide variety of tasks.'"
+    )
+
+    with pytest.raises(BadRequestError):
+        for _ in response:
+            ...
 
 
 @pytest.mark.asyncio
@@ -623,7 +926,6 @@ def test_app_initialization(app_id):
 
 def test_no_code_app_run(no_code_app_tool: NoCodeAppTool):
     inputs = get_app_inputs(no_code_app_tool)
-    print()
 
     result = no_code_app_tool.run(tool_input={"inputs": inputs})
 
@@ -634,7 +936,6 @@ def test_no_code_app_run(no_code_app_tool: NoCodeAppTool):
 @pytest.mark.asyncio
 async def test_no_code_app_arun(no_code_app_tool: NoCodeAppTool):
     inputs = get_app_inputs(no_code_app_tool)
-    print()
 
     result = await no_code_app_tool.arun(tool_input={"inputs": inputs})
 
@@ -710,3 +1011,118 @@ async def test_no_code_app_binded_astreaming(
                 chunk.tool_call_chunks[0]["args"]
                 or chunk.tool_call_chunks[0]["name"] == "No-code application"
             )
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_streaming_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.astream(
+        "Translate the following message to spanish: "
+        "'Hello, world! I like programming on Python, "
+        "and I want to share my knowledge with you."
+        "Python is an interpreted programming language "
+        "that can be used to perform a wide variety of tasks.'"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "en"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "es"
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_source_lang_auto_streaming_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.astream(
+        "Translate the following message to italian: 'Guten tag, queridos amigos!'"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "auto"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "it"
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_source_lang_streaming_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "de"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.astream(
+        "Translate the following message to Italian: 'Guten tag, liebe freunde!'"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "it"
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_target_lang_streaming_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.target_language_code = "fr"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.astream(
+        "Translate the following message: 'Guten tag, liebe freunde!'"
+    )
+
+    full = await anext(response)
+    async for chunk in response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "translation_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs["translation_data"]["source_language_code"] == "de"
+    assert full.additional_kwargs["translation_data"]["target_language_code"] == "en"
+
+
+@pytest.mark.asyncio
+async def test_translation_tool_wrong_source_language_streaming_async(
+    chat_writer: ChatWriter, translation_tool: TranslationTool
+):
+    translation_tool.source_language_code = "gg"
+    chat_writer = chat_writer.bind_tools([translation_tool])
+
+    response = chat_writer.astream(
+        "Translate the following message to spanish: "
+        "'Hello, world! I like programming on Python, "
+        "and I want to share my knowledge with you."
+        "Python is an interpreted programming language "
+        "that can be used to perform a wide variety of tasks.'"
+    )
+
+    with pytest.raises(BadRequestError):
+        async for _ in response:
+            ...

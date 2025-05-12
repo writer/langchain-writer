@@ -53,7 +53,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from writerai.types.chat_completion_chunk import Choice, ChoiceDelta
 
 from langchain_writer.base import BaseWriter
-from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool
+from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool, TranslationTool
 
 
 def convert_message_to_dict(message: BaseMessage) -> dict:
@@ -143,6 +143,12 @@ def convert_dict_to_message(response_message: dict) -> BaseMessage:
         if raw_llm_calls := response_message.get("llm_data", {}):
             additional_kwargs["llm_data"] = raw_llm_calls
 
+        if raw_translation_data := response_message.get("translation_data", {}):
+            additional_kwargs["translation_data"] = raw_translation_data
+
+        if raw_image_data := response_message.get("image_data", {}):
+            additional_kwargs["image_data"] = raw_image_data
+
         return AIMessage(
             content=content,
             additional_kwargs=additional_kwargs,
@@ -229,6 +235,12 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
 
         if raw_llm_calls := delta.get("llm_data", {}):
             additional_kwargs["llm_data"] = raw_llm_calls
+
+        if raw_translation_data := delta.get("translation_data", {}):
+            additional_kwargs["translation_data"] = raw_translation_data
+
+        if raw_image_data := delta.get("image_data", {}):
+            additional_kwargs["image_data"] = raw_image_data
 
         return AIMessageChunk(
             content=content,
@@ -326,7 +338,7 @@ def format_tool(
 
     if isinstance(tool, GraphTool):
         return {
-            "type": "graph",
+            "type": dict_tool.get("type", ""),
             "function": {
                 "description": dict_tool.get("description", ""),
                 "graph_ids": dict_tool.get("graph_ids", []),
@@ -335,7 +347,7 @@ def format_tool(
         }
     elif isinstance(tool, LLMTool):
         return {
-            "type": "llm",
+            "type": dict_tool.get("type", ""),
             "function": {
                 "description": dict_tool.get("description", ""),
                 "model": dict_tool.get("model_name", ""),
@@ -343,6 +355,18 @@ def format_tool(
         }
     elif isinstance(tool, NoCodeAppTool):
         return tool.to_openai_tool()
+    elif isinstance(tool, TranslationTool):
+        return {
+            "type": dict_tool.get("type", ""),
+            "function": {
+                "model": dict_tool.get("model", ""),
+                "formality": dict_tool.get("formality", False),
+                "length_control": dict_tool.get("length_control", False),
+                "mask_profanity": dict_tool.get("mask_profanity", False),
+                "source_language_code": dict_tool.get("source_language_code"),
+                "target_language_code": dict_tool.get("target_language_code"),
+            },
+        }
     else:
         return convert_to_openai_tool(tool)
 
@@ -446,7 +470,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
     """
 
     """Model name to use."""
-    model_name: str = Field(default="palmyra-x4", alias="model")
+    model_name: str = Field(default="palmyra-x5", alias="model")
 
     """What sampling temperature to use."""
     temperature: float = Field(default=0.7, ge=0, le=1)

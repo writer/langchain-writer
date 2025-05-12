@@ -18,7 +18,8 @@ class TestWriterChatStandard(ChatModelIntegrationTests):
     def chat_model_params(self) -> Dict:
         """Return any additional parameters needed."""
         return {
-            "model_name": "palmyra-x4",
+            "model_name": "palmyra-x5",
+            "model_kwargs": {"timeout": 60},
         }
 
     @property
