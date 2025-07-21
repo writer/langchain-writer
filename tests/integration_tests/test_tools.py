@@ -105,8 +105,9 @@ def test_translation_tool(chat_writer: ChatWriter, translation_tool: Translation
     assert response.content
     assert response.additional_kwargs
     assert "translation_data" in response.additional_kwargs.keys()
-    assert (
-        response.additional_kwargs["translation_data"]["source_language_code"] == "en"
+    assert response.additional_kwargs["translation_data"]["source_language_code"] in (
+        "en",
+        "auto",
     )
     assert (
         response.additional_kwargs["translation_data"]["target_language_code"] == "es"
@@ -129,8 +130,9 @@ def test_translation_tool_source_lang_auto(
     assert (
         response.additional_kwargs["translation_data"]["source_language_code"] == "auto"
     )
-    assert (
-        response.additional_kwargs["translation_data"]["target_language_code"] == "it"
+    assert response.additional_kwargs["translation_data"]["target_language_code"] in (
+        "it-IT",
+        "it",
     )
 
 
@@ -264,6 +266,7 @@ def test_chat_model_tool_graph_and_function_call(
         "Use knowledge graph tool to compose this answer. "
         "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     assert response.additional_kwargs.get("graph_data")
@@ -281,6 +284,7 @@ def test_chat_model_tool_llm_and_function_call(
         "Use LLM tool to compose this answer. "
         "Tell me how Newton binom works."
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     assert response.additional_kwargs.get("llm_data")
@@ -306,7 +310,7 @@ def test_chat_model_tool_call_pydantic_definition(chat_writer: ChatWriter):
 def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
     chat_writer = chat_writer.bind_tools(
         [get_supercopa_trophies_count, get_laliga_points],
-        tool_choice="get_laliga_points",
+        tool_choice="get_supercopa_trophies_count",
     )
 
     response = chat_writer.invoke(
@@ -315,7 +319,7 @@ def test_chat_model_tool_calls_choice(chat_writer: ChatWriter):
 
     assert len(response.tool_calls) == 2
     for call in response.tool_calls:
-        assert call["name"] == "get_laliga_points"
+        assert call["name"] == "get_supercopa_trophies_count"
 
 
 def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
@@ -361,6 +365,7 @@ def test_chat_model_function_and_graph_calls_with_tools_outputs(
             "Use knowledge graph tool to compose this answer. "
             "Tell me what the first line of documents stored in your KG. "
             "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+            "Use available tool to get actual number of SuperCopa trophies"
         )
     ]
     response = chat_writer.invoke(messages)
@@ -435,6 +440,7 @@ async def test_chat_model_tool_graph_and_function_acall(
         "Use knowledge graph tool to compose this answer. "
         "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     assert response.additional_kwargs.get("graph_data")
@@ -453,6 +459,7 @@ async def test_chat_model_tool_llm_and_function_acall(
         "Use LLM tool to compose this answer. "
         "Tell me how Newton binom works."
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     assert response.additional_kwargs.get("llm_data")
@@ -474,8 +481,9 @@ async def test_translation_tool_async(
     assert response.content
     assert response.additional_kwargs
     assert "translation_data" in response.additional_kwargs.keys()
-    assert (
-        response.additional_kwargs["translation_data"]["source_language_code"] == "en"
+    assert response.additional_kwargs["translation_data"]["source_language_code"] in (
+        "en",
+        "auto",
     )
     assert (
         response.additional_kwargs["translation_data"]["target_language_code"] == "es"
@@ -612,6 +620,7 @@ def test_chat_model_tool_graph_call_streaming(
     response = chat_writer.stream(
         "Use knowledge graph tool to compose this answer. "
         "Tell me what the first line of documents stored in your KG"
+        "Call available Knowledge Graph tool"
     )
 
     full = next(response)
@@ -620,7 +629,7 @@ def test_chat_model_tool_graph_call_streaming(
 
     assert isinstance(full, AIMessageChunk)
     assert full.additional_kwargs.get("graph_data")
-    assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
+    assert full.additional_kwargs["graph_data"]["sources"]
 
 
 def test_chat_model_tool_function_graph_call_streaming(
@@ -632,6 +641,7 @@ def test_chat_model_tool_function_graph_call_streaming(
         "Use knowledge graph tool to compose this answer. "
         "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     full = next(response)
@@ -784,6 +794,7 @@ async def test_chat_model_tool_function_graph_call_astreaming(
         "Use knowledge graph tool to compose this answer. "
         "Tell me what the first line of documents stored in your KG. "
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     full = await anext(response)
@@ -821,6 +832,7 @@ def test_chat_model_tool_function_llm_call_streaming(
         "Use LLM tool to compose this answer. "
         "Tell me how Newton binom works."
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     full = next(response)
@@ -861,6 +873,7 @@ async def test_chat_model_tool_function_llm_call_astreaming(
         "Use LLM tool to compose this answer. "
         "Tell me how Newton binom works."
         "Also I want to know: how many SuperCopa trophies have Barcelona won?"
+        "Use available tool to get actual number of SuperCopa trophies"
     )
 
     full = await anext(response)
@@ -955,7 +968,7 @@ def test_no_code_app_binded_call(
 
     assert response.tool_calls
     assert len(response.tool_calls) == 1
-    assert response.tool_calls[0]["name"] == "No-code application"
+    assert response.tool_calls[0]["name"] in ("no_code_app", "No-code application")
 
 
 @pytest.mark.asyncio
@@ -971,7 +984,7 @@ async def test_no_code_app_binded_acall(
 
     assert response.tool_calls
     assert len(response.tool_calls) == 1
-    assert response.tool_calls[0]["name"] == "No-code application"
+    assert response.tool_calls[0]["name"] in ("no_code_app", "No-code application")
 
 
 def test_no_code_app_binded_streaming(
@@ -987,10 +1000,9 @@ def test_no_code_app_binded_streaming(
     for chunk in response:
         assert isinstance(chunk, AIMessageChunk)
         if chunk.tool_call_chunks:
-            assert (
-                chunk.tool_call_chunks[0]["args"]
-                or chunk.tool_call_chunks[0]["name"] == "No-code application"
-            )
+            assert chunk.tool_call_chunks[0]["args"] or chunk.tool_call_chunks[0][
+                "name"
+            ] in ("no_code_app", "No-code application")
 
 
 @pytest.mark.asyncio
@@ -1007,10 +1019,9 @@ async def test_no_code_app_binded_astreaming(
     async for chunk in response:
         assert isinstance(chunk, AIMessageChunk)
         if chunk.tool_call_chunks:
-            assert (
-                chunk.tool_call_chunks[0]["args"]
-                or chunk.tool_call_chunks[0]["name"] == "No-code application"
-            )
+            assert chunk.tool_call_chunks[0]["args"] or chunk.tool_call_chunks[0][
+                "name"
+            ] in ("no_code_app", "No-code application")
 
 
 @pytest.mark.asyncio

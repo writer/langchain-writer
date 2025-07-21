@@ -56,11 +56,12 @@ from langchain_writer.base import BaseWriter
 from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool, TranslationTool
 
 
-def convert_message_to_dict(message: BaseMessage) -> dict:
+def convert_message_to_dict(message: BaseMessage, model: str) -> dict:
     """Convert a LangChain message to Writer dictionary.
 
     Args:
         message: The LangChain message.
+        model: Name of model that will handle converted messages
 
     Returns:
         The dictionary.
@@ -75,11 +76,12 @@ def convert_message_to_dict(message: BaseMessage) -> dict:
     elif isinstance(message, AIMessage):
         message_dict["role"] = "assistant"
         if message.tool_calls:
+            args_alias = "parameters" if model == "palmyra-x5" else "arguments"
             message_dict["tool_calls"] = [
                 {
                     "id": tool["id"],
                     "type": "function",
-                    "function": {"name": tool["name"], "arguments": str(tool["args"])},
+                    "function": {"name": tool["name"], args_alias: str(tool["args"])},
                 }
                 for tool in message.tool_calls
             ]
@@ -470,7 +472,7 @@ class ChatWriter(BaseWriter, BaseChatModel):
     """
 
     """Model name to use."""
-    model_name: str = Field(default="palmyra-x5", alias="model")
+    model_name: str = Field(default="palmyra-x4", alias="model")
 
     """What sampling temperature to use."""
     temperature: float = Field(default=0.7, ge=0, le=1)
@@ -534,7 +536,9 @@ class ChatWriter(BaseWriter, BaseChatModel):
         if stop:
             params["stop"] = stop
 
-        message_dicts = [convert_message_to_dict(m) for m in messages]
+        message_dicts = [
+            convert_message_to_dict(m, params.get("model")) for m in messages
+        ]
         return message_dicts, params
 
     def _create_chat_result(self, response: Union[dict, BaseModel]) -> ChatResult:
