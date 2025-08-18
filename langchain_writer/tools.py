@@ -346,3 +346,32 @@ class TranslationTool(BaseTool):
         raise NotImplementedError(
             "Writer TranslationTool does not support direct invocations."
         )
+
+
+class WebSearchTool(BaseTool):
+    """`Writer` WebSearchTool. The web search tool for chat completions allows you
+    to receive most relevant information from web. It surfs the web for information
+    about a given query and return relevant results with source URLs.
+    """
+
+    """Tool type."""
+    type: Literal["web_search"] = "web_search"
+
+    """Tool name that is passed to model when performing tool calling."""
+    name: str = "Web Search tool"
+
+    """The description that is passed to the model when performing tool calling."""
+    description: str = (
+        "Web Search engine that allows you to surf the web for information"
+    )
+
+    """An array of domains to include in the search results."""
+    include_domains: list[str] = Field(default_factory=list)
+
+    """An array of domains to exclude from the search results."""
+    exclude_domains: list[str] = Field(default_factory=list)
+
+    def _run(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "Writer WebSearchTool does not support direct invocations."
+        )

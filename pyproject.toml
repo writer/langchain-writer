@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "langchain-writer"
-version = "0.3.2"
+version = "0.3.3"
 description = "An integration package connecting Writer and LangChain"
 authors = ["Writer, Inc. <dev-feedback@writer.com>"]
 readme = "README.md"
@@ -20,7 +20,7 @@ disallow_untyped_defs = "True"
 python = ">=3.9,<4.0"
 langchain-core = "^0.3.69"
 langchain-text-splitters = "^0.3.5"
-writer-sdk = "2.2.0"
+writer-sdk = ">=2.3.0,<3.0"
 
 [tool.coverage.run]
 omit = ["tests/*"]

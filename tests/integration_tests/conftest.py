@@ -6,7 +6,7 @@ from langchain_core.documents.base import Blob
 
 from langchain_writer import ChatWriter, GraphTool, NoCodeAppTool, WriterTextSplitter
 from langchain_writer.pdf_parser import PDFParser
-from langchain_writer.tools import LLMTool, TranslationTool
+from langchain_writer.tools import LLMTool, TranslationTool, WebSearchTool
 
 load_dotenv()
 
@@ -17,7 +17,7 @@ RESEARCH_APP_ID = os.getenv("RESEARCH_APP_ID")
 
 @pytest.fixture(scope="function")
 def chat_writer():
-    return ChatWriter(model_kwargs={"timeout": 60})
+    return ChatWriter(request_timeout=30)
 
 
 @pytest.fixture(scope="function")
@@ -45,6 +45,11 @@ def get_app_inputs(app: NoCodeAppTool):
 @pytest.fixture(scope="function")
 def translation_tool():
     return TranslationTool()
+
+
+@pytest.fixture(scope="function")
+def web_search_tool():
+    return WebSearchTool()
 
 
 @pytest.fixture(scope="function")

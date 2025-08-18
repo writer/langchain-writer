@@ -53,7 +53,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from writerai.types.chat_completion_chunk import Choice, ChoiceDelta
 
 from langchain_writer.base import BaseWriter
-from langchain_writer.tools import GraphTool, LLMTool, NoCodeAppTool, TranslationTool
+from langchain_writer.tools import (
+    GraphTool,
+    LLMTool,
+    NoCodeAppTool,
+    TranslationTool,
+    WebSearchTool,
+)
 
 
 def convert_message_to_dict(message: BaseMessage, model: str) -> dict:
@@ -151,6 +157,9 @@ def convert_dict_to_message(response_message: dict) -> BaseMessage:
         if raw_image_data := response_message.get("image_data", {}):
             additional_kwargs["image_data"] = raw_image_data
 
+        if raw_web_search_data := response_message.get("web_search_data", {}):
+            additional_kwargs["web_search_data"] = raw_web_search_data
+
         return AIMessage(
             content=content,
             additional_kwargs=additional_kwargs,
@@ -243,6 +252,9 @@ def convert_dict_chunk_to_message_chunk(chunk: dict) -> BaseMessageChunk:
 
         if raw_image_data := delta.get("image_data", {}):
             additional_kwargs["image_data"] = raw_image_data
+
+        if raw_web_search_data := delta.get("web_search_data", {}):
+            additional_kwargs["web_search_data"] = raw_web_search_data
 
         return AIMessageChunk(
             content=content,
@@ -342,6 +354,7 @@ def format_tool(
         return {
             "type": dict_tool.get("type", ""),
             "function": {
+                "name": dict_tool.get("name", ""),
                 "description": dict_tool.get("description", ""),
                 "graph_ids": dict_tool.get("graph_ids", []),
                 "subqueries": dict_tool.get("subqueries", False),
@@ -351,6 +364,7 @@ def format_tool(
         return {
             "type": dict_tool.get("type", ""),
             "function": {
+                "name": dict_tool.get("name", ""),
                 "description": dict_tool.get("description", ""),
                 "model": dict_tool.get("model_name", ""),
             },
@@ -361,6 +375,8 @@ def format_tool(
         return {
             "type": dict_tool.get("type", ""),
             "function": {
+                "name": dict_tool.get("name", ""),
+                "description": dict_tool.get("description", ""),
                 "model": dict_tool.get("model", ""),
                 "formality": dict_tool.get("formality", False),
                 "length_control": dict_tool.get("length_control", False),
@@ -369,6 +385,25 @@ def format_tool(
                 "target_language_code": dict_tool.get("target_language_code"),
             },
         }
+    elif isinstance(tool, WebSearchTool):
+        web_search_tool_dict = {
+            "type": dict_tool.get("type", ""),
+            "function": {
+                # "name": dict_tool.get("name", ""),
+                # "description": dict_tool.get("description", ""),
+            },
+        }
+
+        if include_domains := dict_tool.get("include_domains"):
+            web_search_tool_dict["function"].update(
+                {"include_domains": include_domains}
+            )
+        if exclude_domains := dict_tool.get("exclude_domains"):
+            web_search_tool_dict["function"].update(
+                {"exclude_domains": exclude_domains}
+            )
+
+        return web_search_tool_dict
     else:
         return convert_to_openai_tool(tool)
 
