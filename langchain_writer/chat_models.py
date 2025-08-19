@@ -1,5 +1,6 @@
 """Writer chat models."""
 
+import ast
 from operator import itemgetter
 from typing import (
     Any,
@@ -139,7 +140,16 @@ def convert_dict_to_message(response_message: dict) -> BaseMessage:
             additional_kwargs["tool_calls"] = raw_function_calls
             for raw_tool_call in raw_function_calls:
                 try:
-                    tool_calls.append(parse_tool_call(raw_tool_call, return_id=True))
+                    tool_call = parse_tool_call(raw_tool_call, return_id=True)
+                    tool_args = tool_call.get("args")
+                    if isinstance(
+                        tool_args, str
+                    ):  # In case if LLM returned tool call args as TWO times dumped JSON
+                        # trying to parse it for the second time. Using `literal_eval` because model may return
+                        # a string with single quotes like "{'a': 3, 'b': 4}" and it's impossible to use json.loads
+                        args = ast.literal_eval(tool_args)
+                        tool_call["args"] = args
+                    tool_calls.append(tool_call)
                 except Exception as e:
                     invalid_tool_calls.append(
                         dict(make_invalid_tool_call(raw_tool_call, str(e)))

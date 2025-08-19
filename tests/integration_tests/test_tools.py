@@ -9,7 +9,12 @@ from writerai import BadRequestError
 from writerai.types import ApplicationGenerateContentResponse
 
 from langchain_writer import ChatWriter, GraphTool
-from langchain_writer.tools import LLMTool, NoCodeAppTool, TranslationTool
+from langchain_writer.tools import (
+    LLMTool,
+    NoCodeAppTool,
+    TranslationTool,
+    WebSearchTool,
+)
 from tests.integration_tests.conftest import (
     RESEARCH_APP_ID,
     TEXT_GENERATION_APP_ID,
@@ -93,6 +98,53 @@ get_product_info = {
         },
     },
 }
+
+
+def test_web_search_tool(chat_writer: ChatWriter, web_search_tool: WebSearchTool):
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    response = chat_writer.invoke(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "web_search_data" in response.additional_kwargs.keys()
+    assert response.additional_kwargs.get("web_search_data", {}).get("sources", [])
+
+
+def test_web_search_tool_function_params(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    web_search_tool.include_domains = ["wikipedia.org"]
+    web_search_tool.exclude_domains = ["olympics.com"]
+
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    response = chat_writer.invoke(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "web_search_data" in response.additional_kwargs.keys()
+    assert response.additional_kwargs.get("web_search_data", {}).get("sources", [])
+    assert any(
+        [
+            "wikipedia" in source.get("url", "")
+            for source in response.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
+    assert all(
+        [
+            "olympics" not in source.get("url", "")
+            for source in response.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
 
 
 def test_translation_tool(chat_writer: ChatWriter, translation_tool: TranslationTool):
@@ -469,6 +521,57 @@ async def test_chat_model_tool_llm_and_function_acall(
 
 
 @pytest.mark.asyncio
+async def test_web_search_tool_async(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    response = await chat_writer.ainvoke(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "web_search_data" in response.additional_kwargs.keys()
+    assert response.additional_kwargs.get("web_search_data", {}).get("sources", [])
+
+
+@pytest.mark.asyncio
+async def test_web_search_tool_function_params_async(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    web_search_tool.include_domains = ["wikipedia.org"]
+    web_search_tool.exclude_domains = ["olympics.com"]
+
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    response = await chat_writer.ainvoke(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    assert response.content
+    assert response.additional_kwargs
+    assert "web_search_data" in response.additional_kwargs.keys()
+    assert response.additional_kwargs.get("web_search_data", {}).get("sources", [])
+    assert any(
+        [
+            "wikipedia" in source.get("url", "")
+            for source in response.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
+    assert all(
+        [
+            "olympics" not in source.get("url", "")
+            for source in response.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
+
+
+@pytest.mark.asyncio
 async def test_translation_tool_async(
     chat_writer: ChatWriter, translation_tool: TranslationTool
 ):
@@ -653,6 +756,65 @@ def test_chat_model_tool_function_graph_call_streaming(
     assert len(full.additional_kwargs["graph_data"]["sources"]) > 0
     assert full.tool_calls
     assert len(full.tool_calls) == 1
+
+
+def test_web_search_tool_streaming(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    stream_response = chat_writer.stream(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    full = next(stream_response)
+    for chunk in stream_response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "web_search_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs.get("web_search_data", {}).get("sources", [])
+
+
+def test_web_search_tool_function_params_streaming(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    web_search_tool.include_domains = ["wikipedia.org"]
+    web_search_tool.exclude_domains = ["olympics.com"]
+
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    stream_response = chat_writer.stream(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    full = next(stream_response)
+    for chunk in stream_response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "web_search_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs.get("web_search_data", {}).get("sources", [])
+    assert any(
+        [
+            "wikipedia" in source.get("url", "")
+            for source in full.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
+    assert all(
+        [
+            "olympics" not in source.get("url", "")
+            for source in full.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
 
 
 def test_translation_tool_streaming(
@@ -1022,6 +1184,67 @@ async def test_no_code_app_binded_astreaming(
             assert chunk.tool_call_chunks[0]["args"] or chunk.tool_call_chunks[0][
                 "name"
             ] in ("no_code_app", "No-code application")
+
+
+@pytest.mark.asyncio
+async def test_web_search_tool_streaming_async(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    stream_response = chat_writer.astream(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to get data."
+    )
+
+    full = await anext(stream_response)
+    async for chunk in stream_response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "web_search_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs.get("web_search_data", {}).get("sources", [])
+
+
+@pytest.mark.asyncio
+async def test_web_search_tool_function_params_streaming_async(
+    chat_writer: ChatWriter, web_search_tool: WebSearchTool
+):
+    web_search_tool.include_domains = ["wikipedia.org"]
+    web_search_tool.exclude_domains = ["olympics.com"]
+
+    chat_writer = chat_writer.bind_tools([web_search_tool])
+
+    stream_response = chat_writer.astream(
+        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+    )
+
+    full = await anext(stream_response)
+    async for chunk in stream_response:
+        full += chunk
+
+    assert isinstance(full, AIMessageChunk)
+    assert full.content
+    assert full.additional_kwargs
+    assert "web_search_data" in full.additional_kwargs.keys()
+    assert full.additional_kwargs.get("web_search_data", {}).get("sources", [])
+    assert any(
+        [
+            "wikipedia" in source.get("url", "")
+            for source in full.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
+    assert all(
+        [
+            "olympics" not in source.get("url", "")
+            for source in full.additional_kwargs.get("web_search_data", {}).get(
+                "sources", []
+            )
+        ]
+    )
 
 
 @pytest.mark.asyncio
