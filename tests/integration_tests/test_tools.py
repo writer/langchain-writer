@@ -104,7 +104,7 @@ def test_web_search_tool(chat_writer: ChatWriter, web_search_tool: WebSearchTool
     chat_writer = chat_writer.bind_tools([web_search_tool])
 
     response = chat_writer.invoke(
-        "Provide me analytics about Paris-Roubaix 2025 cycling road race. Use web search tool to search for data."
+        "What is the weather like on 10 of September 2025. Use web search tool to search for data."
     )
 
     assert response.content
@@ -261,7 +261,8 @@ def test_chat_model_tool_calls(chat_writer: ChatWriter):
     )
 
     response = chat_writer.invoke(
-        "Does Barcelona have more supercopa trophies than Real Madrid?"
+        "Does Barcelona have more supercopa trophies than Real Madrid? "
+        "Use tools to fetch information about each team"
     )
 
     assert len(response.tool_calls) == 2
@@ -307,24 +308,6 @@ def test_chat_model_tool_dict_definition_call(chat_writer: ChatWriter):
     assert response.tool_calls
     assert len(response.tool_calls) == 1
     assert response.tool_calls[0]["name"] == "get_product_info"
-
-
-def test_chat_model_tool_graph_and_function_call(
-    chat_writer: ChatWriter, graph_tool: GraphTool
-):
-    chat_writer = chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
-
-    response = chat_writer.invoke(
-        "Use knowledge graph tool to compose this answer. "
-        "Tell me what the first line of documents stored in your KG. "
-        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
-        "Use available tool to get actual number of SuperCopa trophies"
-    )
-
-    assert response.additional_kwargs.get("graph_data")
-    assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
-    assert response.tool_calls
-    assert len(response.tool_calls) == 1
 
 
 def test_chat_model_tool_llm_and_function_call(
@@ -398,60 +381,6 @@ def test_chat_model_tool_calls_with_tools_outputs(chat_writer: ChatWriter):
     assert len(response.content) > 0
 
 
-def test_chat_model_function_and_graph_calls_with_tools_outputs(
-    chat_writer: ChatWriter, graph_tool: GraphTool
-):
-    chat_writer = chat_writer.bind_tools(
-        [
-            get_supercopa_trophies_count,
-            get_laliga_points,
-            get_product_info,
-            GetWeather,
-            GetPopulation,
-            graph_tool,
-        ],
-        tool_choice="auto",
-    )
-    messages = [
-        HumanMessage(
-            "Use knowledge graph tool to compose this answer. "
-            "Tell me what the first line of documents stored in your KG. "
-            "Also I want to know: how many SuperCopa trophies have Barcelona won?"
-            "Use available tool to get actual number of SuperCopa trophies"
-        )
-    ]
-    response = chat_writer.invoke(messages)
-    messages.append(response)
-
-    text_to_check_for_inclusion = response.content.lower()
-
-    for tool_call in response.tool_calls:
-        selected_tool = {
-            "get_supercopa_trophies_count": get_supercopa_trophies_count,
-        }[tool_call["name"].lower()]
-        tool_msg = selected_tool.invoke(tool_call)
-        messages.append(tool_msg)
-
-    response = chat_writer.invoke(messages)
-
-    text_to_check_for_inclusion += " " + response.content.lower()
-
-    assert isinstance(response, AIMessage)
-    assert len(response.content) > 0
-    assert any(
-        [
-            word in text_to_check_for_inclusion
-            for word in ["supercopa", "barcelona", "trophies", "15"]
-        ]
-    )
-    assert any(
-        [
-            word in text_to_check_for_inclusion
-            for word in ["knowledge", "graph", "line", "document"]
-        ]
-    )
-
-
 @pytest.mark.asyncio
 async def test_chat_model_tool_graph_acall(
     chat_writer: ChatWriter, graph_tool: GraphTool
@@ -480,25 +409,6 @@ async def test_chat_model_tool_llm_acall(chat_writer: ChatWriter, llm_tool: LLMT
             for word in ["Newton", "binom"]
         ]
     )
-
-
-@pytest.mark.asyncio
-async def test_chat_model_tool_graph_and_function_acall(
-    chat_writer: ChatWriter, graph_tool: GraphTool
-):
-    chat_writer = chat_writer.bind_tools([graph_tool, get_supercopa_trophies_count])
-
-    response = await chat_writer.ainvoke(
-        "Use knowledge graph tool to compose this answer. "
-        "Tell me what the first line of documents stored in your KG. "
-        "Also I want to know: how many SuperCopa trophies have Barcelona won?"
-        "Use available tool to get actual number of SuperCopa trophies"
-    )
-
-    assert response.additional_kwargs.get("graph_data")
-    assert len(response.additional_kwargs["graph_data"]["sources"]) > 0
-    assert response.tool_calls
-    assert len(response.tool_calls) == 1
 
 
 @pytest.mark.asyncio

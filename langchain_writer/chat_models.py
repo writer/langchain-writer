@@ -1,6 +1,7 @@
 """Writer chat models."""
 
 import ast
+import base64
 from operator import itemgetter
 from typing import (
     Any,
@@ -74,7 +75,10 @@ def convert_message_to_dict(message: BaseMessage, model: str) -> dict:
         The dictionary.
     """
 
-    message_dict = {"role": "", "content": format_message_content(message.content)}
+    message_dict = {
+        "role": "",
+        "content": format_message_content(message.content, model),
+    }
 
     if isinstance(message, ChatMessage):
         message_dict["role"] = message.role
@@ -311,33 +315,107 @@ def create_chat_generation_chunk(
     )
 
 
-def format_message_content(content: Any) -> str:
+def format_message_content(
+    content: Any, model: str
+) -> Union[str, list[dict[str, Any]]]:
     """Format Lang Chain message content. Sanitize if from unnecessary elements.
 
     Args:
         content: Lang Chain message content.
 
     Returns:
-        Formatted content in string format.
+        Formatted content in vision or non vision format.
     """
 
-    if content and isinstance(content, list):
-        formatted_content = ""
-        for block in content:
-            if (
-                isinstance(block, dict)
-                and "type" in block
-                and block["type"] == "tool_use"
-            ):
-                continue
-            elif (
-                isinstance(block, dict) and "type" in block and block["type"] == "text"
-            ):
-                formatted_content += f" {block['text']}"
+    if model == "palmyra-x5":
+        return format_content_for_vision(content)
     else:
-        formatted_content = content
+        return forman_content_for_non_vision(content)
 
-    return formatted_content
+
+def format_content_for_vision(content: Any) -> Union[str, list[dict[str, Any]]]:
+    if content:
+        if isinstance(content, list):
+            formatted_content = []
+            for block in content:
+                if isinstance(block, dict) and "type" in block:
+                    if block["type"] == "text" and "text" in block:
+                        formatted_content += [block]
+                    elif (
+                        block["type"] == "image_url"
+                        and "image_url" in block
+                        and "url" in block["image_url"]
+                    ):
+                        formatted_content += [block]
+                    elif block["type"] == "image" and "url" in block:
+                        formatted_content += [
+                            {"type": "image_url", "image_url": {"url": block["url"]}}
+                        ]
+                    elif (
+                        block["type"] == "image"
+                        and "base64" in block
+                        and "mime_type" in block
+                    ):
+                        formatted_content += [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{block['mime_type']};base64,{base64.b64encode(block['base64']).decode('utf-8')}",
+                                },
+                            }
+                        ]
+
+                    else:
+                        raise TypeError(
+                            f"Unsupported content type: {block['type']}, 'text'; 'image_url' or 'image' expected."
+                            f" Or unsupported block format: {block}."
+                        )
+                elif isinstance(block, str):
+                    formatted_content += [{"type": "text", "text": block}]
+                else:
+                    raise TypeError(
+                        f"Unsupported content type: {type(content)}. Expected dict with 'type' key or str."
+                    )
+        elif isinstance(content, str):
+            formatted_content = content
+        else:
+            raise TypeError(
+                f"Unsupported content type: {type(content)}. Expected list or str."
+            )
+
+        return formatted_content
+    else:
+        return ""
+
+
+def forman_content_for_non_vision(content: Any) -> str:
+    if content:
+        if isinstance(content, list):
+            formatted_content = ""
+            for block in content:
+                if isinstance(block, dict) and "type" in block:
+                    if block["type"] == "text":
+                        formatted_content += f" {block['text']}"
+                    else:
+                        raise TypeError(
+                            f"Unsupported content type: {block['type']}. Expected 'text' type."
+                        )
+                elif isinstance(block, str):
+                    formatted_content += f" {block}"
+                else:
+                    raise TypeError(
+                        f"Unsupported content type: {type(content)}. Expected dict with 'type' key or str."
+                    )
+        elif isinstance(content, str):
+            formatted_content = content
+        else:
+            raise TypeError(
+                f"Unsupported content type: {type(content)}. Expected list or str."
+            )
+
+        return formatted_content
+    else:
+        return ""
 
 
 def format_tool(

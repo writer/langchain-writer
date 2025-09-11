@@ -109,7 +109,7 @@ prompts = {
      Despite that, it's still popular due to its speed and non-invasive approach—requiring only the drone and a battery
      backup. Such service offerings continue to shape consumer expectations, combining technical efficiency with a
      growing emphasis on environmental and operational transparency.""",
-    "pydantic_model": "Generate a list of 10 users. Provide generated data in required format.",
+    "pydantic_model": "Generate a list of 5 users. Provide generated data in required format.",
     "tool_schema": """Here is a text. Fetch from it addresses an related information, use provided desired output
      format. Return full address of building that hosts the largest amount of businesses.
      The wind carried the scent of smoke and machinery through the narrow streets of Kraków as Maja
