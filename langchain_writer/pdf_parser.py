@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Iterator, Literal
+from langchain_writer.deprecation import deprecated
 
 from langchain_core.document_loaders import BaseBlobParser
 from langchain_core.documents import Document
@@ -51,7 +52,7 @@ async def delete_file_async(writer_client: AsyncWriter, file_id: str) -> str:
 def generate_file_name():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
-
+@deprecated("PDFParser is deprecated and will be removed in a future version(https://dev.writer.com/home/parse-pdf#parse-a-pdf)")
 class PDFParser(BaseWriter, BaseBlobParser):
     """`Writer` PDF parser integration.
 

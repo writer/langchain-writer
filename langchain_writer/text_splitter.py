@@ -6,8 +6,10 @@ from langchain_text_splitters import TextSplitter
 from pydantic import Field
 
 from langchain_writer.base import BaseWriter
+from langchain_writer.deprecation import deprecated
 
 
+@deprecated("Text splitter is deprecated and will be removed in a future version(https://dev.writer.com/home/integrations/langchain#writertextsplitter)")
 class WriterTextSplitter(BaseWriter, TextSplitter):
     """`Writer` text splitter integration.
 
